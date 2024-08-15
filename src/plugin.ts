@@ -1,6 +1,4 @@
-import { NativeModules } from 'react-native';
-const { MyNativeModule } = NativeModules;
-
+import { NativeModules, NativeEventEmitter } from 'react-native';
 import type {
   ReactNativeIvsPlayerState,
   ReactNativeIvsPlayerPlugin,
@@ -9,6 +7,17 @@ import type {
   ReactNativeIvsPlayerCastStatus,
   ReactNativeIvsPlayerEvent,
 } from './definitions';
+
+const { IvsPlayerViewManager } = NativeModules;
+
+const ivsPlayerEvents = new NativeEventEmitter(IvsPlayerViewManager);
+
+ivsPlayerEvents.addListener('onState', (event) => {
+    console.log(event.state);
+});
+
+// Call methods
+IvsPlayerViewManager.setAutoQuality(true);
 
 export type ListenerCallback = (err: any, ...args: any[]) => void;
 export interface Plugin {
@@ -23,7 +32,7 @@ export interface PluginListenerHandle {
 }
 
 export class ReactNativeIvsPlayer
-  extends MyNativeModule
+// extends IvsPlayerViewManager
   implements ReactNativeIvsPlayerPlugin
 {
   addListener(
