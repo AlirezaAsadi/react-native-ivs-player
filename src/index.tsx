@@ -1,15 +1,19 @@
-import { NativeModules, NativeEventEmitter, Platform, UIManager, requireNativeComponent, type ViewStyle } from 'react-native';
+import {
+  NativeModules,
+  NativeEventEmitter,
+  Platform,
+  requireNativeComponent,
+  type ViewStyle,
+} from 'react-native';
 export * from './definitions';
-import type {
-  ReactNativeIvsPlayerPlugin,
-} from './definitions';
+import type { ReactNativeIvsPlayerPlugin } from './definitions';
 
 const { IvsPlayerViewManager } = NativeModules;
 
 const ivsPlayerEvents = new NativeEventEmitter(IvsPlayerViewManager);
 
 ivsPlayerEvents.addListener('onState', (event) => {
-    console.log(event.state);
+  console.log(event.state);
 });
 
 // Call methods
@@ -21,28 +25,26 @@ const LINKING_ERROR =
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo Go\n';
 
-  const CapacitorIvsPlayer = (IvsPlayerViewManager
-  ? IvsPlayerViewManager
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
-    )) as ReactNativeIvsPlayerPlugin;
+const CapacitorIvsPlayer = (
+  IvsPlayerViewManager
+    ? IvsPlayerViewManager
+    : new Proxy(
+        {},
+        {
+          get() {
+            throw new Error(LINKING_ERROR);
+          },
+        }
+      )
+) as ReactNativeIvsPlayerPlugin;
 
 type Props = {
   style: ViewStyle;
 };
-const MyNativeView = requireNativeComponent<Props>('IvsPlayerView');
-
+const IvsPlayer = requireNativeComponent<Props>('IvsPlayerView');
 
 const { EventEmitter } = NativeModules;
 
 const CapacitorIvsPlayerEventEmitter = new NativeEventEmitter(EventEmitter);
 
-export { MyNativeView, CapacitorIvsPlayer, CapacitorIvsPlayerEventEmitter };
-
-
-
+export { IvsPlayer, CapacitorIvsPlayer, CapacitorIvsPlayerEventEmitter };
