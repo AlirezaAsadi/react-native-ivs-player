@@ -23,57 +23,87 @@ func stateToStateName (_ state: IVSPlayer.State) -> String {
 
 @objc(EventEmitter)
 class EventEmitter: RCTEventEmitter {
-  
-  private static var eventEmitter: RCTEventEmitter?
-
-  override init() {
-    super.init()
-    EventEmitter.eventEmitter = self
-  }
-
-public override func supportedEvents() -> [String]! {
-    return ["onState", "onCastStatus", "startPip", "stopPip", "expandPip", "closePip", "onCastStatus", "onRebuffer", "onSeekCompleted", "onVideoSize", "onQuality", "onError", "onDuration", "onCue", "onState"]
-}
-
-  @objc
-  override static func requiresMainQueueSetup() -> Bool {
-    return true
-  }
-  
-  func sendEvent(withName: String, body: [String: Any]?) {
-    EventEmitter.eventEmitter?.sendEvent(withName: withName, body: body)
-  }
-}
-
-
-class CapacitorIVSPlayer: UIView, IVSPlayer.Delegate {
-
-    var capacitorPlugin: IvsPlayerViewManager!
-    let eventEmitter = EventEmitter()
     
-    @objc func addPlayerView() {
-        print("CapacitorIVSPlayer addPlayerView")
-        DispatchQueue.main.async {
-          print("CapacitorIVSPlayer addPlayerView:main")
-          if let rootViewController = UIApplication.shared.keyWindow?.rootViewController {
-              let playerView = self.capacitorPlugin.playerView // Your playerView
-            // Customize your playerView here
-              print("CapacitorIVSPlayer addPlayerView:main:xxx1")
-            rootViewController.view.addSubview(playerView)
-              print("CapacitorIVSPlayer addPlayerView:main:xxx2")
-              
-//              capacitorPlugin.bridge?.viewController?.view.addSubview(capacitorPlugin.playerView)
-//              capacitorPlugin.applyLastSeekPosition()
-          }
-            print("CapacitorIVSPlayer addPlayerView:main:settingViewController")
-           self.capacitorPlugin.viewController = UIApplication.shared.keyWindow?.rootViewController;
+    private static var eventEmitter: RCTEventEmitter?
+    
+    override init() {
+        super.init()
+        EventEmitter.eventEmitter = self
+    }
+    
+    public override func supportedEvents() -> [String]! {
+        return ["onState", "onCastStatus", "startPip", "stopPip", "expandPip", "closePip", "onCastStatus", "onRebuffer", "onSeekCompleted", "onVideoSize", "onQuality", "onError", "onDuration", "onCue", "onState"]
+    }
+    
+    @objc
+    override static func requiresMainQueueSetup() -> Bool {
+        return true
+    }
+    
+    func sendEvent(withName: String, body: [String: Any]?) {
+        EventEmitter.eventEmitter?.sendEvent(withName: withName, body: body)
+    }
+}
+
+@objc(CAPPluginCall)
+class CAPPluginCall: NSObject {
+    private var options: NSDictionary
+    //    private var successHandler: RCTPromiseResolveBlock?
+    //    private var errorHandler: RCTPromiseRejectBlock?
+    
+    init(options: NSDictionary) {
+        self.options = options
+        //        self.successHandler = resolve
+        //        self.errorHandler = reject
+    }
+    
+    // Generic method to retrieve a value for a given key with a default value
+    func get<T>(_ key: String, _ defaultValue: T) -> T {
+        if let value = options[key] as? T {
+            return value
         }
-      }
+        return defaultValue
+    }
     
+    // Convenience methods for specific types
+    func getBool<T>(_ key: String, _ defaultValue: T) -> T {
+        return get(key, defaultValue)
+    }
     
+    func getString(_ key: String, _ defaultValue: String) -> String {
+        return get(key, defaultValue)
+    }
+    
+    func getInt(_ key: String, _ defaultValue: Int?) -> Int? {
+        return get(key, defaultValue)
+    }
+    
+    func getFloat(_ key: String, _ defaultValue: Float = 0.0) -> Float {
+        return get(key, defaultValue)
+    }
+    
+    // Method to check if a key exists
+    func hasOption(_ key: String) -> Bool {
+        return options[key] != nil
+    }
+    
+    //    // Resolve the call with success and return data to JavaScript
+    //    func resolve(_ result: [String: Any] = [:]) {
+    //        successHandler?(result)
+    //    }
+    //
+    //    // Reject the call with an error code and message
+    //    func reject(_ code: String) {
+    //        errorHandler?("failed", code, nil)
+    //    }
+}
 
+class CapacitorIVSPlayer: NSObject, IVSPlayer.Delegate {
+    
+    var capacitorPlugin: IvsPlayerViewManager!
+    
     func player(_ player: IVSPlayer, didChangeState state: IVSPlayer.State) {
-        print("CapacitorIVSPlayer state change \(state)")
+        //        print("CapacitorIVSPlayer state change \(state)")
         let stateName = stateToStateName(state)
         print("CapacitorIVSPlayer \(stateName)")
         if state == .ready && capacitorPlugin.autoPlay &&
@@ -82,43 +112,39 @@ class CapacitorIVSPlayer: UIView, IVSPlayer.Delegate {
         }
         // when playing add to view
         if state == .playing {
-            //capacitorPlugin.bridge?.viewController?.view.addSubview(capacitorPlugin.playerView)
-//            self.capacitorPlugin?.playerView.addSubview(capacitorPlugin.playerView)
-////            addPlayerView()
-            self.capacitorPlugin.viewController?.view.addSubview(capacitorPlugin.playerView)
+            capacitorPlugin.viewController.view.addSubview(capacitorPlugin.playerView)
             capacitorPlugin.applyLastSeekPosition()
         }
-        eventEmitter.sendEvent(withName: "onState", body: ["state": stateName])
+        capacitorPlugin.notifyListeners("onState", data: ["state": stateName])
     }
-
+    
     func player(_ player: IVSPlayer, didOutputCue cue: IVSCue) {
-        eventEmitter.sendEvent(withName: "onCue", body: ["cue": cue])
+        capacitorPlugin.notifyListeners("onCue", data: ["cue": cue])
     }
-
+    
     func player(_ player: IVSPlayer, didChangeDuration duration: CMTime) {
-        eventEmitter.sendEvent(withName: "onDuration", body: ["duration": duration.seconds])
+        capacitorPlugin.notifyListeners("onDuration", data: ["duration": duration.seconds])
     }
-
+    
     func player(_ player: IVSPlayer, didFailWithError error: Error) {
-        eventEmitter.sendEvent(withName: "onError", body: ["error": error.localizedDescription])
+        capacitorPlugin.notifyListeners("onError", data: ["error": error.localizedDescription])
     }
-
+    
     func playerWillRebuffer(_ player: IVSPlayer) {
-        eventEmitter.sendEvent(withName: "onRebuffer", body: [:])
+        capacitorPlugin.notifyListeners("onRebuffer", data: [:])
     }
     func player(_ player: IVSPlayer, didSeekTo time: CMTime) {
-        eventEmitter.sendEvent(withName: "onSeekCompleted", body: ["position": time.seconds])
+        capacitorPlugin.notifyListeners("onSeekCompleted", data: ["position": time.seconds])
     }
     func player(_ player: IVSPlayer, didChangeVideoSize videoSize: CGSize) {
-        eventEmitter.sendEvent(withName: "onVideoSize", body: ["videoSize": videoSize])
+        capacitorPlugin.notifyListeners("onVideoSize", data: ["videoSize": videoSize])
     }
-
+    
     func player(_ player: IVSPlayer, didChangeQuality quality: IVSQuality?) {
-        eventEmitter.sendEvent(withName: "onQuality", body: ["quality": quality?.name ?? ""])
+        capacitorPlugin.notifyListeners("onQuality", data: ["quality": quality?.name ?? ""])
     }
-
+    
 }
-
 
 class TouchThroughView: IVSPlayerView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
@@ -131,18 +157,16 @@ class TouchThroughView: IVSPlayerView {
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
  */
-
-
 @objc(IvsPlayerViewManager)
-class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate {
+public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate {
     
     private let PLUGIN_VERSION = "0.13.34"
     
-
-    var viewController: UIViewController?
+    let event = EventEmitter()
     let player = IVSPlayer()
     let playerDelegate = CapacitorIVSPlayer()
     let playerView = TouchThroughView()
+    let viewController: UIViewController = UIViewController()
     private var _pipController: Any?
     private var isFScreen = false
     private var originalFrame: CGRect?
@@ -157,34 +181,10 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
     var backgroundState: String = "PAUSED"
     var lastForegroundEvent: Date = Date();
     var lastSeekPosBeforeSrcChange: CMTime? = nil
-    func hexStringToUIColor(hexColor: String) -> UIColor {
-        let stringScanner = Scanner(string: hexColor)
-
-        if(hexColor.hasPrefix("#")) {
-          stringScanner.scanLocation = 1
-        }
-        var color: UInt32 = 0
-        stringScanner.scanHexInt32(&color)
-
-        let r = CGFloat(Int(color >> 16) & 0x000000FF)
-        let g = CGFloat(Int(color >> 8) & 0x000000FF)
-        let b = CGFloat(Int(color) & 0x000000FF)
-
-        return UIColor(red: r / 255.0, green: g / 255.0, blue: b / 255.0, alpha: 1)
-      }
     
-    override func view() -> CapacitorIVSPlayer {
-        var picture = self.playerDelegate
-        picture.backgroundColor = self.hexStringToUIColor(hexColor: "#0000ff")
-    //     return v;
-        return picture
-    }
-    
-
-    override init() {
+    public override init() {
         super.init()
-        print("CapacitorIVSPlayer load")
-        viewController?.view?.backgroundColor = UIColor.black
+        self.viewController.view.backgroundColor = UIColor.black
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
@@ -195,19 +195,28 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive(notification:)), name: UIApplication.didBecomeActiveNotification, object: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(applicationWillEnterForeground(notification:)), name: UIApplication.willEnterForegroundNotification, object: nil)
-
+        
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidEnterBackground(_ :)), name: UIApplication.didEnterBackgroundNotification, object: nil)
-
+        
         NotificationCenter.default.addObserver(self, selector: #selector(deviceWillLock), name: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil)
-
+        
         let routeChangeNotification = AVAudioSession.routeChangeNotification
         NotificationCenter.default.addObserver(self, selector: #selector(handleAudioRouteChange(_:)), name: routeChangeNotification, object: nil)
-
+        
         player.delegate = playerDelegate
         self.playerView.player = self.player
         self.preparePictureInPicture()
     }
-
+    
+    public override func view() -> UIView? {
+        var picture = self.viewController.view
+        return picture
+    }
+    
+    public func notifyListeners(_ withName: String, data: [String: Any]?) {
+        event.sendEvent(withName: withName, body: data)
+    }
+    
     func createAvPlayer(url: URL?) {
         guard let url = url else {
             return
@@ -220,13 +229,13 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         let playerLayer = AVPlayerLayer(player: avPlayer)
         // Set frame and other properties if you wish here for your playerLayer
         playerLayer.frame = self.playerView.frame
-
+        
         // Also remove any attached player first, if exist
         self.playerView.player = nil
-
+        
         self.playerView.layer.addSublayer(playerLayer)
     }
-
+    
     func handleNewAirPlaySource() {
         print("CapacitorIVSPlayer AirPlay is active")
         self.airplayButton.removeFromSuperview() // try to hide the airplay selector
@@ -235,13 +244,13 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         avPlayer?.play()
         // set PLAYING after 1 sec
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.playerDelegate.eventEmitter.sendEvent(withName: "onState", body: ["state": "PLAYING"])
+            self.notifyListeners("onState", data: ["state": "PLAYING"])
         }
         // send to listner
         isCastActive = true
-        self.playerDelegate.eventEmitter.sendEvent(withName: "onCastStatus", body: ["isActive": true])
+        self.notifyListeners("onCastStatus", data: ["isActive": true])
     }
-
+    
     func removeAvPlayer() {
         // Pause the AVPlayer
         self.avPlayer?.pause()
@@ -255,7 +264,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
                 }
             }
         }
-
+        
         // Remove the AVPlayerLayer
         if let sublayers = self.playerView.layer.sublayers {
             for layer in sublayers {
@@ -264,26 +273,26 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
                 }
             }
         }
-
+        
         // Clear the AVPlayer
         self.avPlayer?.replaceCurrentItem(with: nil)
     }
-
+    
     func handleAirPlaySourceDeactivated() {
         print("CapacitorIVSPlayer AirPlay is disabled")
         removeAvPlayer()
         isCastActive = false
-        self.playerDelegate.eventEmitter.sendEvent(withName: "onCastStatus", body: ["isActive": false])
+        self.notifyListeners("onCastStatus", data: ["isActive": false])
         // Re-attach the original player to the playerView
         if isClosed {
             return
         }
         self.playerView.player = self.player
         self.player.play()
-        self.playerDelegate.eventEmitter.sendEvent(withName: "onState", body: ["state": "PLAYING"])
-
+        self.notifyListeners("onState", data: ["state": "PLAYING"])
+        
     }
-
+    
     @objc func handleAudioRouteChange(_ notification: NSNotification) {
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
@@ -301,7 +310,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         }
     }
-
+    
     @objc func deviceWillLock() {
         print("CapacitorIVSPlayer deviceWillLock")
         if self.backgroundState != "PLAYING" {
@@ -325,12 +334,12 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             playerView.player?.pause()
         }
     }
-
+    
     @objc func applicationWillEnterForeground(notification: Notification) {
         print("CapacitorIVSPlayer applicationWillEnterForeground")
         lastForegroundEvent = Date();
     }
-
+    
     @objc func applicationDidBecomeActive(notification: Notification) {
         guard #available(iOS 15, *), let pipController = pipController else {
             return
@@ -338,10 +347,10 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         print("CapacitorIVSPlayer applicationDidBecomeActive \(pipController.isPictureInPictureActive)")
         if pipController.isPictureInPictureActive && Date().timeIntervalSince(lastForegroundEvent) < 1 {
             pipController.stopPictureInPicture()
-            self.playerDelegate.eventEmitter.sendEvent(withName: "stopPip", body: [:])
+            self.notifyListeners("stopPip", data: [:])
         }
     }
-
+    
     @available(iOS 15, *)
     private var pipController: AVPictureInPictureController? {
         get {
@@ -351,7 +360,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             _pipController = newValue
         }
     }
-
+    
     func fetchImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
         let task = URLSession.shared.dataTask(with: url) { (data, _, error) in
             guard let data = data, let image = UIImage(data: data), error == nil else {
@@ -362,7 +371,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         task.resume()
     }
-
+    
     func setupNowPlayingInfo(title: String, subTitle: String, url: String) {
         var nowPlayingInfo: [String: Any] = [
             MPMediaItemPropertyTitle: title,
@@ -374,17 +383,17 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         if let imageUrl = URL(string: url) {
             fetchImage(from: imageUrl) { fetchedImage in
                 guard let image = fetchedImage else { return }
-
+                
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in return image }
                 nowPlayingInfo.updateValue(artwork, forKey: MPMediaItemPropertyArtwork)
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
             }
         }
     }
-
+    
     func setupRemoteTransportControls() {
         let commandCenter = MPRemoteCommandCenter.shared()
-
+        
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { [unowned self] _ in
             if self.player.state != .playing {
@@ -393,7 +402,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
             return .commandFailed
         }
-
+        
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.pauseCommand.addTarget { [unowned self] _ in
             if self.player.state == .playing {
@@ -403,40 +412,49 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             return .commandFailed
         }
     }
-
-    @objc func getPluginVersion(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getPluginVersion(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["version": self.PLUGIN_VERSION])
     }
-
-    @objc func getAutoQuality(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-
+    
+    @objc func getAutoQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        
         resolve(["autoQuality": self.player.autoQualityMode])
     }
-
-    @objc func setAutoQuality(_ autoQuality: Bool, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func setAutoQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        print("CapacitorIVSPlayer setAutoQuality...")
+        
+        let call = CAPPluginCall(options: options)
         DispatchQueue.main.async {
-            self.player.autoQualityMode = autoQuality ?? !self.player.autoQualityMode
+            self.player.autoQualityMode = call.getBool("autoQuality", !self.player.autoQualityMode) ?? true
         }
         resolve(true)
     }
-
-    @objc func getQualities(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getQualities(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         var qualities = [String]()
         for quality in self.player.qualities {
             qualities.append(quality.name)
         }
         resolve(["qualities": qualities])
     }
-
-    @objc func getQuality(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["quality": self.player.quality?.name ?? ""])
     }
-
-    @objc func setQuality(_ quality: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        let targetQualityName = quality
-
+    
+    @objc func setQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        //        guard let targetQualityName = call.getString("quality", "") else {
+        //            print("CapacitorIVSPlayer Error: Quality name is not set")
+        //            reject("failed", "Quality name is not set")
+        //            return
+        //        }
+        let call = CAPPluginCall(options: options)
+        let targetQualityName = call.getString("quality", "")
+        
         var selectedQuality: IVSQuality?
-
+        
         // find quality in list
         for quality in self.player.qualities {
             if quality.name == targetQualityName {
@@ -444,23 +462,23 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
                 break
             }
         }
-
+        
         // Check if we found quality
         guard let targetQuality = selectedQuality else {
             print("CapacitorIVSPlayer Error: Quality not found")
             reject("failed", "Quality not found", nil)
             return
         }
-
+        
         // Set quality
         DispatchQueue.main.async {
             self.player.quality = targetQuality
         }
-
+        
         resolve(true)
     }
-
-    @objc func getFrame(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getFrame(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let frame = playerView.frame
         let frameDict: [String: CGFloat] = [
             "x": frame.origin.x,
@@ -470,26 +488,28 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         ]
         resolve(frameDict)
     }
-
-    @objc func getMute(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getMute(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getMute")
         resolve(["mute": self.player.muted])
     }
-
-    @objc func setMute(_ mute: Bool, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func setMute(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer setMute")
+        let call = CAPPluginCall(options: options)
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
-                self.avPlayer?.isMuted = mute ?? !self.avPlayer!.isMuted
+                self.avPlayer?.isMuted = call.getBool("mute", !self.avPlayer!.isMuted)
             } else {
-                self.player.muted = mute ?? !self.avPlayer!.isMuted
+                self.player.muted = call.getBool("mute", !self.player.muted)
             }
         }
         resolve(true)
     }
-
-    @objc func _setPip(_ pip: Bool) -> Bool {
+    
+    @objc func _setPip(_ options: NSDictionary) -> Bool {
         print("CapacitorIVSPlayer setPip")
+        let call = CAPPluginCall(options: options)
         guard #available(iOS 15, *), let pipController = pipController else {
             return false
         }
@@ -501,29 +521,29 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         if isCastActive {
             return false
         }
-        let ispip = pip ?? false;
+        let ispip = call.getBool("pip", false) ?? false
         if ispip {
             isClosed = true
             pipController.startPictureInPicture()
-            self.playerDelegate.eventEmitter.sendEvent(withName: "startPip", body: [:])
+            self.notifyListeners("startPip", data: [:])
         } else {
             isClosed = false
             pipController.stopPictureInPicture()
-            self.playerDelegate.eventEmitter.sendEvent(withName: "stopPip", body: [:])
+            self.notifyListeners("stopPip", data: [:])
         }
         print("CapacitorIVSPlayer _setPip \(ispip) done")
         return true
     }
-
-    @objc func setPip(_ pip: Bool, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if _setPip(pip) {
+    
+    @objc func setPip(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        if _setPip(options) {
             resolve(true)
         } else {
             reject("failed", "Not possible right now", nil)
         }
     }
-
-    @objc func getPip(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getPip(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getPip")
         guard #available(iOS 15, *), let pipController = pipController else {
             reject("failed", "Not possible right now", nil)
@@ -531,20 +551,19 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         resolve(["pip": pipController.isPictureInPictureActive])
     }
-
-    func _setFrame(_x: Int? = nil,
-                         _y: Int? = nil,
-                         w: Int? = nil,
-                         h: Int? = nil) -> Bool {
-        print("CapacitorIVSPlayer _setFrame")
-        let viewController =  self.playerView
+    
+    @objc func _setFrame(_ options: NSDictionary) -> Bool {
+        //        guard let viewController = self.viewController else {
+        //            return false
+        //        }
+        let call = CAPPluginCall(options: options)
         let screenSize: CGRect = UIScreen.main.bounds
-        let topPadding = viewController.safeAreaInsets.top
-
-        let x = _x ?? 0
-        let y = _y ?? Int(topPadding)
-        let width = w ?? Int(round(Float(screenSize.width)))
-        let height = h ?? Int(round(Float(screenSize.width * (9.0 / 16.0))))
+        let topPadding = viewController.view.safeAreaInsets.top
+        
+        let x = Int(round(call.getFloat("x", Float(0))))
+        let y = Int(round(call.getFloat("y", Float(topPadding))))
+        let width = Int(round(call.getFloat("width", Float(screenSize.width))))
+        let height = Int(round(call.getFloat("height", Float(screenSize.width * (9.0 / 16.0)))))
         self.playerView.playerLayer.zPosition = -1
         self.playerView.frame = CGRect(
             x: x,
@@ -555,47 +574,40 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         print("CapacitorIVSPlayer _setFrame x:\(x) y:\(y) width:\(width) height:\(height) done")
         return true
     }
-
-    @objc func setFrame(_
-                      options: NSDictionary,
-                      resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setFrame", options)
-        let x = Int(round(options["x"] as? Float ?? 0))
-        let y = Int(round(options["y"] as? Float ?? 0))
-        let width = Int(round(options["width"] as? Float ?? 0))
-        let height = Int(round(options["height"] as? Float ?? 0))
-        
-        print("CapacitorIVSPlayer setFrame x:\(x) y:\(y) width:\(width) height:\(height) done")
-
+    
+    @objc func setFrame(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        print("CapacitorIVSPlayer setFrame x y")
         DispatchQueue.main.async {
-            if self._setFrame(_x: x, _y: y, w: width, h: height) {
+            if self._setFrame(options) {
                 resolve(true)
             } else {
-                print("CapacitorIVSPlayer setFrame failed", options)
                 reject("failed", "Unable to _setFrame", nil)
             }
         }
+        resolve(true)
     }
-
+    
     @objc func _setPlayerPosition(toBack: Bool) -> Bool {
         self.toBack = toBack
         if toBack {
-            self.viewController?.view?.backgroundColor = UIColor.clear
-            self.viewController?.view?.isOpaque = false
-//            self.viewController?.view?.scrollView.backgroundColor = UIColor.clear
-//            self.viewController?.view?.scrollView.isOpaque = false
+            self.viewController.view.backgroundColor = UIColor.clear
+            self.viewController.view.isOpaque = false
+            //            self.viewController.view.scrollView.backgroundColor = UIColor.clear
+            //            self.viewController.view.scrollView.isOpaque = false
         } else {
-            guard let viewController = self.viewController else {
+            guard let viewController = viewController.view else {
                 return false
             }
-            viewController.view.bringSubviewToFront(self.playerView)
+            viewController.bringSubviewToFront(self.playerView)
         }
         print("CapacitorIVSPlayer _setPlayerPosition done")
         return true
     }
-
-    @objc func setPlayerPosition(_ toBack: Bool, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    
+    @objc func setPlayerPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer setPlayerPosition")
+        let call = CAPPluginCall(options: options)
+        let toBack = call.getBool("toBack", false)
         DispatchQueue.main.async {
             if self._setPlayerPosition(toBack: toBack) {
                 resolve(true)
@@ -604,11 +616,11 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         }
     }
-
-    @objc func getPlayerPosition(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getPlayerPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["toBack": self.toBack])
     }
-
+    
     @objc func _setBackgroundState(backgroundState: String) -> Bool {
         if ["PAUSED", "PLAYING"].contains(backgroundState)  {
             self.backgroundState = backgroundState
@@ -618,10 +630,11 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         print("CapacitorIVSPlayer _setBackgroundState done")
         return true
     }
-
-    @objc func setBackgroundState(_ backgroundState: IVSPlayer.State,resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    
+    @objc func setBackgroundState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer setBackgroundState")
-        let backgroundState = stateToStateName(backgroundState) ?? "PAUSED"
+        let call = CAPPluginCall(options: options)
+        let backgroundState: String = call.getString("backgroundState", "PAUSED")
         DispatchQueue.main.async {
             if self._setBackgroundState(backgroundState: backgroundState)  {
                 resolve(true)
@@ -630,11 +643,11 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         }
     }
-
-    @objc func getBackgroundState(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getBackgroundState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["backgroundState": self.backgroundState])
     }
-
+    
     public func loadUrl(url: String) {
         let u = URL(string: url)
         self.player.load(u)
@@ -644,7 +657,7 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         print("CapacitorIVSPlayer loadUrl")
     }
-
+    
     public func cyclePlayer(prevUrl: String, nextUrl: String) -> Bool {
         self.removeAvPlayer()
         if prevUrl != nextUrl {
@@ -656,10 +669,10 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         self.loadUrl(url: nextUrl)
         return true
     }
-
-    @objc func cast(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func cast(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer cast")
-
+        
         DispatchQueue.main.async {
             if !self.isCastActive {
                 // Create AVPlayer if needed and start playing
@@ -668,14 +681,13 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
                 }
                 self.avPlayer = AVPlayer(url: self.player.path!)
             }
-
+            
             // Add a AVRoutePickerView to show airplay dialog. You can create this button and add it to your desired place in UI
             self.airplayButton = AVRoutePickerView(frame: CGRect(x: 0, y: 0, width: 30.0, height: 30.0))
             self.airplayButton.activeTintColor = UIColor.blue
             self.airplayButton.tintColor = UIColor.white
-            self.viewController?.view.addSubview(self.airplayButton)
-//            self.bridge?.parent.viewController?.view.addSubview(self.airplayButton) // Assumes bridge.viewController is the view you want to add to
-
+            self.viewController.view.addSubview(self.airplayButton) // Assumes bridge.viewController is the view you want to add to
+            
             // Pressing the button programmatically to show airplay modal
             for subview in self.airplayButton.subviews {
                 if let button = subview as? UIButton {
@@ -687,38 +699,36 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         resolve(true)
     }
-
-    @objc func getCastStatus(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getCastStatus(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getCastStatus")
         resolve(["isActive": isCastActive])
     }
-
-    @objc func create(_ 
-                      options: NSDictionary,
-                      resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-         print("CapacitorIVSPlayer create", options)                
-        let playbackRate = options["playbackRate"] as? Float ?? 1.0
+    
+    @objc func create(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let call = CAPPluginCall(options: options)
+        let playbackRate = call.getFloat("playbackRate", 1.0)
         
         if (self.player.playbackRate != playbackRate && playbackRate >= 0.5 && playbackRate <= 2.0) {
             self.player.playbackRate = playbackRate
         } else {
             self.player.playbackRate = 1.0
         }
-
-        let url = options["url"] as? String ?? ""
-        autoPlay = options["autoPlay"] as? Bool ?? false
-        toBack = options["toBack"] as? Bool ?? false
         
+        let url = call.getString("url", "")
+        autoPlay = call.getBool("autoPlay", false)
+        toBack = call.getBool("toBack", false)
         DispatchQueue.main.async {
-            let title = options["title"] as? String ?? ""
-            let subTitle = options["subTitle"] as? String ?? ""
-            let cover = options["cover"] as? String ?? ""
+            let title = call.getString("title", "")
+            let subTitle = call.getString("subtitle", "")
+            let cover = call.getString("cover", "")
+            let _options = options;
             self.setupNowPlayingInfo(title: title, subTitle: subTitle, url: cover)
             self.setupRemoteTransportControls()
             let setupDone = self.cyclePlayer(prevUrl: self.player.path?.absoluteString ?? "", nextUrl: url)
             print("CapacitorIVSPlayer setupDone \(setupDone)")
-            self._setPip(false)
-            let FrameDone = self._setFrame()
+            self._setPip(options)
+            let FrameDone = self._setFrame(_options)
             let PlayerPositionDone = self._setPlayerPosition(toBack: self.toBack)
             if setupDone && FrameDone && PlayerPositionDone {
                 self.isClosed = false
@@ -729,17 +739,17 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         }
     }
-
+    
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
         print("CapacitorIVSPlayer restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
         // The user tapped the "restore" button in PiP mode, set the flag to true
         // But first we need to fire the expandPip event so the frontend can prepare the UI
-        self.playerDelegate.eventEmitter.sendEvent(withName: "expandPip", body: [:])
+        self.notifyListeners("expandPip", data: [:])
         self.didRestorePiP = true
         self.isClosed = false
         completionHandler(true)
     }
-
+    
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         print("CapacitorIVSPlayer didRestorePiP \(self.didRestorePiP)")
         if self.didRestorePiP {
@@ -748,48 +758,48 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             print("CapacitorIVSPlayer expandPip done")
         } else {
             // This was a close PiP
-            self.playerDelegate.eventEmitter.sendEvent(withName: "closePip", body: [:])
+            self.notifyListeners("closePip", data: [:])
             print("CapacitorIVSPlayer closePip done")
         }
     }
-
+    
     private func preparePictureInPicture() {
-
+        
         guard #available(iOS 15, *), AVPictureInPictureController.isPictureInPictureSupported() else {
             return
         }
-
+        
         if let existingController = self.pipController {
             if existingController.ivsPlayerLayer == playerView.playerLayer {
                 return
             }
             self.pipController = nil
         }
-
+        
         guard let pipController = AVPictureInPictureController(ivsPlayerLayer: playerView.playerLayer) else {
             return
         }
-
+        
         self.pipController = pipController
         pipController.delegate = self
         pipController.canStartPictureInPictureAutomaticallyFromInline = true
         print("CapacitorIVSPlayer preparePictureInPicture done")
     }
-
-    @objc func getUrl(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getUrl(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         guard let url = player.path else {
             reject("failed", "No url found", nil)
             return
         }
         resolve(["url": url.absoluteString])
     }
-
-    @objc func getState(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let stateName = stateToStateName(player.state)
         resolve(["state": stateName])
     }
-
-    @objc func pause(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func pause(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer pause")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -800,8 +810,8 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         resolve(true)
     }
-
-    @objc func start(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func start(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer start")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -812,8 +822,8 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         resolve(true)
     }
-
-    @objc func delete(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func delete(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer delete")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -825,10 +835,10 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         }
         resolve(true)
     }
-
-    @objc func getSeekPosition(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    
+    @objc func getSeekPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         var position: Double = 0.0
-
+        
         if self.isCastActive {
             guard let avPlayer = self.avPlayer else {
                 reject("failed", "Player not instantiated", nil)
@@ -839,16 +849,17 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         } else {
             position = self.player.position.seconds
         }
-
+        
         resolve(["position": position])
     }
-
-    @objc func seekTo(_ position: Double, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        let givenPos = Int64(position ?? -1.0)
+    
+    @objc func seekTo(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let call = CAPPluginCall(options: options)
+        let givenPos = Int64(call.getFloat("position", -1.0))
         
         if givenPos != -1 {
             let parsedPos = CMTimeMake(value: givenPos, timescale: 1)
-
+            
             if self.isCastActive {
                 guard let avPlayer = self.avPlayer else {
                     reject("failed", "Player not instantiated", nil)
@@ -859,15 +870,16 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             } else {
                 self.player.seek(to: parsedPos)
             }
-
+            
             resolve(true)
         } else {
             reject("failed", "Invalid seek position", nil)
         }
     }
-
-    @objc func setPlaybackRate(_ playbackRate: Float, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let givenRate: Float = playbackRate ?? 1.0
+    
+    @objc func setPlaybackRate(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let call = CAPPluginCall(options: options)
+        let givenRate: Float = call.getFloat("playbackRate") ?? 1.0
         
         if (givenRate < 0.5 || givenRate > 2.0) {
             reject("failed", "Playback rate should be a value between 0.5 and 2.0 (both inclusive), where 1.0 is the default rate.", nil)
@@ -882,8 +894,8 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         }
     }
-
-    @objc func getPlaybackRate(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    
+    @objc func getPlaybackRate(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 reject("failed", "Playback rate can not be queried nor adjusted while casting!", nil)
@@ -907,8 +919,9 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
         self.lastSeekPosBeforeSrcChange = nil
     }
     
-    @objc func updatePlayerSrcUrl(_ url: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        let callSrc = url
+    @objc func updatePlayerSrcUrl(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        let call = CAPPluginCall(options: options)
+        let callSrc = call.getString("url", "")
         
         if callSrc == "" {
             reject("failed", "Source property is required", nil)
@@ -926,10 +939,9 @@ class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate
             }
         } else {
             self.lastSeekPosBeforeSrcChange = self.player.position
-
+            
             self.loadUrl(url: callSrc)
         }
-
-        resolve(true)
+        
     }
 }
