@@ -174,13 +174,41 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     private var airplayButton = AVRoutePickerView()
     var didRestorePiP: Bool = false
     var isClosed: Bool = true
-    var toBack: Bool = false
     var autoPlay: Bool = false
+    var toBack: Bool = false
+    var _cover: String = ""
+    var _thumbnailUrl: String = ""
     var isCastActive: Bool = false
     var avPlayer: AVPlayer?
     var backgroundState: String = "PAUSED"
     var lastForegroundEvent: Date = Date();
     var lastSeekPosBeforeSrcChange: CMTime? = nil
+    //
+    //    @objc var playbackRate: Float = 1.0 {
+    //        didSet {
+    //            self.player.playbackRate = playbackRate
+    //        }
+    //    }
+    //    @objc var title: String = "" {
+    //        didSet {
+    //
+    //        }
+    //    }
+    //    @objc var subtitle: String = "" {
+    //        didSet {
+    //        }
+    //    }
+    //    @objc var toBack: Bool = false {
+    //        didSet {
+    //        }
+    //    }
+    @objc var url: String? {
+        didSet {
+            if let nextUrl = url, !url!.isEmpty {
+                self.cyclePlayer(prevUrl: self.player.path?.absoluteString ?? "", nextUrl: nextUrl)
+            }
+        }
+    }
     
     public override init() {
         super.init()
@@ -511,17 +539,20 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         print("CapacitorIVSPlayer setPip")
         let call = CAPPluginCall(options: options)
         guard #available(iOS 15, *), let pipController = pipController else {
+            print("CapacitorIVSPlayer setPipx1")
             return false
         }
+        print("CapacitorIVSPlayer setPipx2")
         // check if isPictureInPicturePossible
         if !pipController.isPictureInPicturePossible {
+            print("CapacitorIVSPlayer setPipx3")
             return false
         }
         print("CapacitorIVSPlayer isCastActive \(isCastActive)")
         if isCastActive {
             return false
         }
-        let ispip = call.getBool("pip", false) ?? false
+        let ispip = call.getBool("pip", true) ?? true
         if ispip {
             isClosed = true
             pipController.startPictureInPicture()
@@ -534,6 +565,9 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         print("CapacitorIVSPlayer _setPip \(ispip) done")
         return true
     }
+    public override static func requiresMainQueueSetup() -> Bool {
+        return true
+      }
     
     @objc func setPip(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         if _setPip(options) {

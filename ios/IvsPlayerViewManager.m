@@ -4,7 +4,17 @@
 
 @interface RCT_EXTERN_MODULE(IvsPlayerViewManager, RCTViewManager)
 
-//RCT_EXPORT_VIEW_PROPERTY(color, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(streamId, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(url, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(title, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(subtitle, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(description, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(cover, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(thumbnailUrl, NSString)
+//RCT_EXPORT_VIEW_PROPERTY(playbackRate, float)
+//RCT_EXPORT_VIEW_PROPERTY(autoPlay, BOOL)
+//RCT_EXPORT_VIEW_PROPERTY(pipEnabled, BOOL)
+//RCT_EXPORT_VIEW_PROPERTY(toBackEnabled, BOOL)
 
 RCT_EXTERN_METHOD(create:(NSDictionary)options resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject);
 RCT_EXTERN_METHOD(start:(NSDictionary)options resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject);

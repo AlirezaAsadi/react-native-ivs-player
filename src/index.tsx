@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 export * from './definitions';
 import type { ReactNativeIvsPlayerPlugin } from './definitions';
+import React, { useImperativeHandle, useRef } from 'react';
 
 const { IvsPlayerViewManager } = NativeModules;
 
@@ -32,10 +33,21 @@ const ReactNativeIvsPlayer = (
       )
 ) as ReactNativeIvsPlayerPlugin;
 
-type Props = {
-  style: ViewStyle;
+type ReactNativeIvsPlayerProps = {
+  style?: ViewStyle;
 };
-const IvsPlayer = requireNativeComponent<Props>('IvsPlayerView');
+const VIEW_NAME = 'IvsPlayerView';
+const IvsPlayerView =
+  requireNativeComponent<ReactNativeIvsPlayerProps>(VIEW_NAME);
+
+const IvsPlayer = React.forwardRef<
+  ReactNativeIvsPlayerPlugin,
+  ReactNativeIvsPlayerProps
+>((props, ref) => {
+  const nativeRef = useRef(null);
+  useImperativeHandle(ref, () => ReactNativeIvsPlayer);
+  return <IvsPlayerView {...props} ref={nativeRef} />;
+});
 
 const { EventEmitter } = NativeModules;
 
