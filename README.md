@@ -19,6 +19,15 @@ import { IvsPlayer } from "react-native-ivs-player";
 <IvsPlayer />
 ```
 
+## How to publish a new version
+
+
+```sh
+yarn prepare
+yarn release
+npm publish
+```
+
 
 ## Contributing
 
