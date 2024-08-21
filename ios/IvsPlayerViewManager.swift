@@ -441,11 +441,11 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         }
     }
     
-    @objc func getPluginVersion(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getPluginVersion(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["version": self.PLUGIN_VERSION])
     }
     
-    @objc func getAutoQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getAutoQuality(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         
         resolve(["autoQuality": self.player.autoQualityMode])
     }
@@ -460,7 +460,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func getQualities(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getQualities(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         var qualities = [String]()
         for quality in self.player.qualities {
             qualities.append(quality.name)
@@ -468,7 +468,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(["qualities": qualities])
     }
     
-    @objc func getQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getQuality(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["quality": self.player.quality?.name ?? ""])
     }
     
@@ -506,7 +506,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func getFrame(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getFrame(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let frame = playerView.frame
         let frameDict: [String: CGFloat] = [
             "x": frame.origin.x,
@@ -517,7 +517,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(frameDict)
     }
     
-    @objc func getMute(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getMute(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getMute")
         resolve(["mute": self.player.muted])
     }
@@ -577,7 +577,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         }
     }
     
-    @objc func getPip(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getPip(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getPip")
         guard #available(iOS 15, *), let pipController = pipController else {
             reject("failed", "Not possible right now", nil)
@@ -590,6 +590,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         //        guard let viewController = self.viewController else {
         //            return false
         //        }
+//        return true;
         let call = CAPPluginCall(options: options)
         let screenSize: CGRect = UIScreen.main.bounds
         let topPadding = viewController.view.safeAreaInsets.top
@@ -598,13 +599,15 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         let y = Int(round(call.getFloat("y", Float(topPadding))))
         let width = Int(round(call.getFloat("width", Float(screenSize.width))))
         let height = Int(round(call.getFloat("height", Float(screenSize.width * (9.0 / 16.0)))))
-        self.playerView.playerLayer.zPosition = -1
-        self.playerView.frame = CGRect(
-            x: x,
-            y: y,
-            width: width,
-            height: height
-        )
+//        self.playerView.playerLayer.zPosition = -1
+        self.playerView.frame = CGRectMake(0 , 0, self.viewController.view.frame.width, self.viewController.view.frame.height)
+//        self.playerView.frame = CGRect(
+//            x: x,
+//            y: y,
+//            width: width,
+//            height: height
+//        )
+        
         print("CapacitorIVSPlayer _setFrame x:\(x) y:\(y) width:\(width) height:\(height) done")
         return true
     }
@@ -651,7 +654,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         }
     }
     
-    @objc func getPlayerPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getPlayerPosition(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["toBack": self.toBack])
     }
     
@@ -678,7 +681,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         }
     }
     
-    @objc func getBackgroundState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getBackgroundState(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["backgroundState": self.backgroundState])
     }
     
@@ -704,7 +707,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         return true
     }
     
-    @objc func cast(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func cast(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer cast")
         
         DispatchQueue.main.async {
@@ -734,7 +737,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func getCastStatus(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getCastStatus(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer getCastStatus")
         resolve(["isActive": isCastActive])
     }
@@ -820,7 +823,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         print("CapacitorIVSPlayer preparePictureInPicture done")
     }
     
-    @objc func getUrl(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getUrl(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         guard let url = player.path else {
             reject("failed", "No url found", nil)
             return
@@ -828,12 +831,12 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(["url": url.absoluteString])
     }
     
-    @objc func getState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getState(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         let stateName = stateToStateName(player.state)
         resolve(["state": stateName])
     }
     
-    @objc func pause(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func pause(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer pause")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -845,7 +848,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func start(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func start(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer start")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -857,7 +860,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func delete(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func delete(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         print("CapacitorIVSPlayer delete")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
@@ -870,7 +873,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func getSeekPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getSeekPosition(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         var position: Double = 0.0
         
         if self.isCastActive {
@@ -929,7 +932,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         }
     }
     
-    @objc func getPlaybackRate(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getPlaybackRate(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 reject("failed", "Playback rate can not be queried nor adjusted while casting!", nil)
