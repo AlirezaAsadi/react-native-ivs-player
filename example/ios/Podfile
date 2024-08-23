@@ -2,4 +2,3 @@ ws_dir = Pathname.new(__dir__)
 
 workspace 'IvsPlayerExample.xcworkspace'
 
-use_test_app!
