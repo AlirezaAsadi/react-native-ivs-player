@@ -1,10 +1,3 @@
-interface ReactNativeFrame {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export interface PluginListenerHandle {
   remove: () => Promise<void>;
 }
@@ -33,13 +26,7 @@ export interface ReactNativeIvsPlayerCreateOptions {
 
   autoPlay?: boolean;
   pip?: boolean;
-  toBack?: boolean;
-
-  x?: number;
-  y?: number;
-
-  height?: number;
-  width?: number;
+  zoom?: boolean;
 }
 
 export type ReactNativeIvsPlayerEvent =
@@ -76,25 +63,10 @@ export interface ReactNativeIvsPlayerPlugin {
   delete(): Promise<void>;
   getUrl(): Promise<{ url: string }>;
   getState(): Promise<{ state: ReactNativeIvsPlayerState }>;
-  setPlayerPosition(options?: { toBack: boolean }): Promise<void>;
-  getPlayerPosition(): Promise<{ toBack: boolean }>;
   setAutoQuality(options?: { autoQuality?: boolean }): Promise<void>;
   getAutoQuality(): Promise<{ autoQuality: boolean }>;
   setPip(options?: { pip?: boolean }): Promise<void>;
   getPip(): Promise<{ pip: boolean }>;
-  /**
-   * Set the frame of the player view, all number have to be positive and integers
-   * @param options {x: number, y: number, width: number, height: number}
-   * @returns
-   * @since 1.0.0
-   */
-  setFrame(options?: {
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-  }): Promise<void>;
-  getFrame(): Promise<ReactNativeFrame>;
   setBackgroundState(options: {
     backgroundState: ReactNativeIvsPlayerBackgroundState;
   }): Promise<void>;
