@@ -45,16 +45,12 @@ class EventEmitter: RCTEventEmitter {
     }
 }
 
-@objc(CAPPluginCall)
-class CAPPluginCall: NSObject {
+@objc(PluginArgs)
+class PluginArgs: NSObject {
     private var options: NSDictionary
-    //    private var successHandler: RCTPromiseResolveBlock?
-    //    private var errorHandler: RCTPromiseRejectBlock?
     
     init(options: NSDictionary) {
         self.options = options
-        //        self.successHandler = resolve
-        //        self.errorHandler = reject
     }
     
     // Generic method to retrieve a value for a given key with a default value
@@ -86,77 +82,160 @@ class CAPPluginCall: NSObject {
     func hasOption(_ key: String) -> Bool {
         return options[key] != nil
     }
-    
-    //    // Resolve the call with success and return data to JavaScript
-    //    func resolve(_ result: [String: Any] = [:]) {
-    //        successHandler?(result)
-    //    }
-    //
-    //    // Reject the call with an error code and message
-    //    func reject(_ code: String) {
-    //        errorHandler?("failed", code, nil)
-    //    }
 }
 
-class CapacitorIVSPlayer: NSObject, IVSPlayer.Delegate {
+class ReactNativeIVSPlayer: NSObject, IVSPlayer.Delegate {
     
-    var capacitorPlugin: IvsPlayerViewManager!
+    var plugin: IvsPlayerViewManager!
     
     func player(_ player: IVSPlayer, didChangeState state: IVSPlayer.State) {
-        //        print("CapacitorIVSPlayer state change \(state)")
+        //        print("ReactNativeIVSPlayer state change \(state)")
         let stateName = stateToStateName(state)
-        print("CapacitorIVSPlayer \(stateName)")
-        if state == .ready && capacitorPlugin.autoPlay &&
-            !capacitorPlugin.isCastActive {
-            capacitorPlugin.player.play()
+        print("ReactNativeIVSPlayer \(stateName)")
+        if state == .ready && plugin.autoPlay &&
+            !plugin.isCastActive {
+            plugin.player.play()
         }
         // when playing add to view
         if state == .playing {
-            capacitorPlugin.viewController.view.addSubview(capacitorPlugin.playerView)
-            capacitorPlugin.applyLastSeekPosition()
+            plugin.viewController.view.addSubview(plugin.playerView)
+            plugin.viewController.view.clipsToBounds = true
+            plugin.playerView.frame = plugin.viewController.view.frame
+            plugin.playerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            plugin.playerView.videoGravity = .resizeAspect
+            
+            plugin.applyLastSeekPosition()
         }
-        capacitorPlugin.notifyListeners("onState", data: ["state": stateName])
+        plugin.notifyListeners("onState", data: ["state": stateName])
     }
     
     func player(_ player: IVSPlayer, didOutputCue cue: IVSCue) {
-        capacitorPlugin.notifyListeners("onCue", data: ["cue": cue])
+        plugin.notifyListeners("onCue", data: ["cue": cue])
     }
     
     func player(_ player: IVSPlayer, didChangeDuration duration: CMTime) {
-        capacitorPlugin.notifyListeners("onDuration", data: ["duration": duration.seconds])
+        plugin.notifyListeners("onDuration", data: ["duration": duration.seconds])
     }
     
     func player(_ player: IVSPlayer, didFailWithError error: Error) {
-        capacitorPlugin.notifyListeners("onError", data: ["error": error.localizedDescription])
+        plugin.notifyListeners("onError", data: ["error": error.localizedDescription])
     }
     
     func playerWillRebuffer(_ player: IVSPlayer) {
-        capacitorPlugin.notifyListeners("onRebuffer", data: [:])
+        plugin.notifyListeners("onRebuffer", data: [:])
     }
     func player(_ player: IVSPlayer, didSeekTo time: CMTime) {
-        capacitorPlugin.notifyListeners("onSeekCompleted", data: ["position": time.seconds])
+        plugin.notifyListeners("onSeekCompleted", data: ["position": time.seconds])
     }
     func player(_ player: IVSPlayer, didChangeVideoSize videoSize: CGSize) {
-        capacitorPlugin.notifyListeners("onVideoSize", data: ["videoSize": videoSize])
+        plugin.notifyListeners("onVideoSize", data: ["videoSize": videoSize])
     }
     
     func player(_ player: IVSPlayer, didChangeQuality quality: IVSQuality?) {
-        capacitorPlugin.notifyListeners("onQuality", data: ["quality": quality?.name ?? ""])
+        plugin.notifyListeners("onQuality", data: ["quality": quality?.name ?? ""])
     }
     
 }
 
-class TouchThroughView: IVSPlayerView {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        let view = super.hitTest(point, with: event)
-        return view == self ? nil : view
+class PlayerBaseView: IVSPlayerView {
+    private var currentScale: CGFloat = 1.0
+    private var initialCenter: CGPoint = .zero
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
     }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
+    
+    public func setupZoomGestures() {
+        
+        // Pinch Gesture for Zooming
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        self.addGestureRecognizer(pinchGesture)
+        
+        // Pan Gesture for Moving
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        self.addGestureRecognizer(panGesture)
+    }
+    
+    @objc private func handlePinch(_ sender: UIPinchGestureRecognizer) {
+        guard let view = sender.view else { return }
+        
+        if sender.state == .began || sender.state == .changed {
+            let newScale = currentScale * sender.scale
+            
+            // Ensure the scale does not go below 1.0
+            if newScale >= 1.0 {
+                view.transform = CGAffineTransform(scaleX: newScale, y: newScale)
+                currentScale = newScale
+            } else {
+                view.transform = CGAffineTransform.identity
+                currentScale = 1.0
+            }
+            
+            sender.scale = 1.0
+        }
+        
+        if sender.state == .ended {
+            adjustViewPositionAfterZoom(view: view)
+            initialCenter = view.center
+        }
+    }
+    
+    @objc private func handlePan(_ sender: UIPanGestureRecognizer) {
+        guard let view = sender.view else { return }
+        
+        if currentScale > 1.0 {
+            let translation = sender.translation(in: view.superview)
+            var newCenter = CGPoint(x: initialCenter.x + translation.x, y: initialCenter.y + translation.y)
+            
+            // Adjust the center to make sure the view stays within bounds
+            newCenter = adjustCenterForBounds(newCenter)
+            
+            view.center = newCenter
+            
+            if sender.state == .ended {
+                initialCenter = view.center
+            }
+        }
+    }
+    
+    private func adjustViewPositionAfterZoom(view: UIView) {
+        let scaledWidth = bounds.width * currentScale
+        let scaledHeight = bounds.height * currentScale
+        
+        var newCenter = view.center
+        
+        // Constrain the new center within the allowed bounds
+        let offsetX = max(0, (scaledWidth - bounds.width) / 2)
+        let offsetY = max(0, (scaledHeight - bounds.height) / 2)
+        
+        newCenter.x = max(bounds.width / 2 - offsetX, min(bounds.width / 2 + offsetX, newCenter.x))
+        newCenter.y = max(bounds.height / 2 - offsetY, min(bounds.height / 2 + offsetY, newCenter.y))
+        
+        view.center = newCenter
+    }
+    
+    private func adjustCenterForBounds(_ center: CGPoint) -> CGPoint {
+        let scaledWidth = bounds.width * currentScale
+        let scaledHeight = bounds.height * currentScale
+        
+        var adjustedCenter = center
+        
+        // Constrain the new center within the allowed bounds
+        let offsetX = max(0, (scaledWidth - bounds.width) / 2)
+        let offsetY = max(0, (scaledHeight - bounds.height) / 2)
+        
+        adjustedCenter.x = max(bounds.width / 2 - offsetX, min(bounds.width / 2 + offsetX, adjustedCenter.x))
+        adjustedCenter.y = max(bounds.height / 2 - offsetY, min(bounds.height / 2 + offsetY, adjustedCenter.y))
+        
+        return adjustedCenter
+    }
+    
 }
 
-/**
- * Please read the Capacitor iOS Plugin Development Guide
- * here: https://capacitorjs.com/docs/plugins/ios
- */
 @objc(IvsPlayerViewManager)
 public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerDelegate {
     
@@ -164,8 +243,8 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     
     let event = EventEmitter()
     let player = IVSPlayer()
-    let playerDelegate = CapacitorIVSPlayer()
-    let playerView = TouchThroughView()
+    let playerDelegate = ReactNativeIVSPlayer()
+    let playerView = PlayerBaseView()
     let viewController: UIViewController = UIViewController()
     private var _pipController: Any?
     private var isFScreen = false
@@ -175,7 +254,6 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     var didRestorePiP: Bool = false
     var isClosed: Bool = true
     var autoPlay: Bool = false
-    var toBack: Bool = false
     var _cover: String = ""
     var _thumbnailUrl: String = ""
     var isCastActive: Bool = false
@@ -183,25 +261,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     var backgroundState: String = "PAUSED"
     var lastForegroundEvent: Date = Date();
     var lastSeekPosBeforeSrcChange: CMTime? = nil
-    //
-    //    @objc var playbackRate: Float = 1.0 {
-    //        didSet {
-    //            self.player.playbackRate = playbackRate
-    //        }
-    //    }
-    //    @objc var title: String = "" {
-    //        didSet {
-    //
-    //        }
-    //    }
-    //    @objc var subtitle: String = "" {
-    //        didSet {
-    //        }
-    //    }
-    //    @objc var toBack: Bool = false {
-    //        didSet {
-    //        }
-    //    }
+    
     @objc var url: String? {
         didSet {
             if let nextUrl = url, !url!.isEmpty {
@@ -217,9 +277,9 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("CapacitorIVSPlayer ‼️ Could not setup AVAudioSession: \(error)")
+            print("ReactNativeIVSPlayer ‼️ Could not setup AVAudioSession: \(error)")
         }
-        playerDelegate.capacitorPlugin = self
+        playerDelegate.plugin = self
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive(notification:)), name: UIApplication.didBecomeActiveNotification, object: nil)
         
         NotificationCenter.default.addObserver(self, selector: #selector(applicationWillEnterForeground(notification:)), name: UIApplication.willEnterForegroundNotification, object: nil)
@@ -237,8 +297,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     public override func view() -> UIView? {
-        var picture = self.viewController.view
-        return picture
+        return self.viewController.view
     }
     
     public func notifyListeners(_ withName: String, data: [String: Any]?) {
@@ -265,7 +324,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     func handleNewAirPlaySource() {
-        print("CapacitorIVSPlayer AirPlay is active")
+        print("ReactNativeIVSPlayer AirPlay is active")
         self.airplayButton.removeFromSuperview() // try to hide the airplay selector
         self.playerView.player?.pause()
         createAvPlayer(url: self.player.path!)
@@ -283,7 +342,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         // Pause the AVPlayer
         self.avPlayer?.pause()
         self.avPlayer?.rate = 0.0
-        print("CapacitorIVSPlayer removeAvPlayer")
+        print("ReactNativeIVSPlayer removeAvPlayer")
         // Detach AVPlayer from AVPlayerLayer
         if let sublayers = self.playerView.layer.sublayers {
             for layer in sublayers {
@@ -307,7 +366,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     func handleAirPlaySourceDeactivated() {
-        print("CapacitorIVSPlayer AirPlay is disabled")
+        print("ReactNativeIVSPlayer AirPlay is disabled")
         removeAvPlayer()
         isCastActive = false
         self.notifyListeners("onCastStatus", data: ["isActive": false])
@@ -328,9 +387,9 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             return
         }
         let session = AVAudioSession.sharedInstance()
-        print("CapacitorIVSPlayer handleAudioRouteChange \(reasonValue) \(userInfo)")
+        print("ReactNativeIVSPlayer handleAudioRouteChange \(reasonValue) \(userInfo)")
         for output in session.currentRoute.outputs {
-            print("CapacitorIVSPlayer output \(output.portType)")
+            print("ReactNativeIVSPlayer output \(output.portType)")
             if output.portType == AVAudioSession.Port.airPlay && !isCastActive {
                 handleNewAirPlaySource()
             } else if output.portType == AVAudioSession.Port.builtInSpeaker && isCastActive {
@@ -340,7 +399,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func deviceWillLock() {
-        print("CapacitorIVSPlayer deviceWillLock")
+        print("ReactNativeIVSPlayer deviceWillLock")
         if self.backgroundState != "PLAYING" {
             DispatchQueue.main.async {
                 self.player.pause()
@@ -349,22 +408,22 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func applicationDidEnterBackground(_ notification: NSNotification) {
-        print("CapacitorIVSPlayer applicationDidEnterBackground")
+        print("ReactNativeIVSPlayer applicationDidEnterBackground")
         guard #available(iOS 15, *), let pipController = pipController else {
-            print("CapacitorIVSPlayer !pipController")
+            print("ReactNativeIVSPlayer !pipController")
             playerView.player?.pause()
             return
         }
-        print("CapacitorIVSPlayer isPictureInPicturePossible: \(pipController.isPictureInPicturePossible)")
-        print("CapacitorIVSPlayer isPictureInPictureSuspended: \(pipController.isPictureInPictureSuspended)")
-        print("CapacitorIVSPlayer isPictureInPictureActive: \(pipController.isPictureInPictureActive)")
+        print("ReactNativeIVSPlayer isPictureInPicturePossible: \(pipController.isPictureInPicturePossible)")
+        print("ReactNativeIVSPlayer isPictureInPictureSuspended: \(pipController.isPictureInPictureSuspended)")
+        print("ReactNativeIVSPlayer isPictureInPictureActive: \(pipController.isPictureInPictureActive)")
         if !pipController.isPictureInPictureActive {
             playerView.player?.pause()
         }
     }
     
     @objc func applicationWillEnterForeground(notification: Notification) {
-        print("CapacitorIVSPlayer applicationWillEnterForeground")
+        print("ReactNativeIVSPlayer applicationWillEnterForeground")
         lastForegroundEvent = Date();
     }
     
@@ -372,7 +431,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         guard #available(iOS 15, *), let pipController = pipController else {
             return
         }
-        print("CapacitorIVSPlayer applicationDidBecomeActive \(pipController.isPictureInPictureActive)")
+        print("ReactNativeIVSPlayer applicationDidBecomeActive \(pipController.isPictureInPictureActive)")
         if pipController.isPictureInPictureActive && Date().timeIntervalSince(lastForegroundEvent) < 1 {
             pipController.stopPictureInPicture()
             self.notifyListeners("stopPip", data: [:])
@@ -451,9 +510,9 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func setAutoQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setAutoQuality...")
+        print("ReactNativeIVSPlayer setAutoQuality...")
         
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         DispatchQueue.main.async {
             self.player.autoQualityMode = call.getBool("autoQuality", !self.player.autoQualityMode) ?? true
         }
@@ -473,12 +532,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func setQuality(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        //        guard let targetQualityName = call.getString("quality", "") else {
-        //            print("CapacitorIVSPlayer Error: Quality name is not set")
-        //            reject("failed", "Quality name is not set")
-        //            return
-        //        }
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         let targetQualityName = call.getString("quality", "")
         
         var selectedQuality: IVSQuality?
@@ -493,7 +547,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         
         // Check if we found quality
         guard let targetQuality = selectedQuality else {
-            print("CapacitorIVSPlayer Error: Quality not found")
+            print("ReactNativeIVSPlayer Error: Quality not found")
             reject("failed", "Quality not found", nil)
             return
         }
@@ -506,25 +560,14 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func getFrame(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let frame = playerView.frame
-        let frameDict: [String: CGFloat] = [
-            "x": frame.origin.x,
-            "y": frame.origin.y,
-            "width": frame.size.width,
-            "height": frame.size.height
-        ]
-        resolve(frameDict)
-    }
-    
     @objc func getMute(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer getMute")
+        print("ReactNativeIVSPlayer getMute")
         resolve(["mute": self.player.muted])
     }
     
     @objc func setMute(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setMute")
-        let call = CAPPluginCall(options: options)
+        print("ReactNativeIVSPlayer setMute")
+        let call = PluginArgs(options: options)
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 self.avPlayer?.isMuted = call.getBool("mute", !self.avPlayer!.isMuted)
@@ -536,19 +579,18 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func _setPip(_ options: NSDictionary) -> Bool {
-        print("CapacitorIVSPlayer setPip")
-        let call = CAPPluginCall(options: options)
+        print("ReactNativeIVSPlayer setPip")
+        let call = PluginArgs(options: options)
         guard #available(iOS 15, *), let pipController = pipController else {
-            print("CapacitorIVSPlayer setPipx1")
+            print("ReactNativeIVSPlayer pipController is unavailable")
             return false
         }
-        print("CapacitorIVSPlayer setPipx2")
         // check if isPictureInPicturePossible
         if !pipController.isPictureInPicturePossible {
-            print("CapacitorIVSPlayer setPipx3")
+            print("ReactNativeIVSPlayer isPictureInPicturePossible is false")
             return false
         }
-        print("CapacitorIVSPlayer isCastActive \(isCastActive)")
+        print("ReactNativeIVSPlayer isCastActive \(isCastActive)")
         if isCastActive {
             return false
         }
@@ -562,12 +604,12 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             pipController.stopPictureInPicture()
             self.notifyListeners("stopPip", data: [:])
         }
-        print("CapacitorIVSPlayer _setPip \(ispip) done")
+        print("ReactNativeIVSPlayer _setPip \(ispip) done")
         return true
     }
     public override static func requiresMainQueueSetup() -> Bool {
         return true
-      }
+    }
     
     @objc func setPip(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         if _setPip(options) {
@@ -578,84 +620,12 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func getPip(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer getPip")
+        print("ReactNativeIVSPlayer getPip")
         guard #available(iOS 15, *), let pipController = pipController else {
             reject("failed", "Not possible right now", nil)
             return
         }
         resolve(["pip": pipController.isPictureInPictureActive])
-    }
-    
-    @objc func _setFrame(_ options: NSDictionary) -> Bool {
-        //        guard let viewController = self.viewController else {
-        //            return false
-        //        }
-//        return true;
-        let call = CAPPluginCall(options: options)
-        let screenSize: CGRect = UIScreen.main.bounds
-        let topPadding = viewController.view.safeAreaInsets.top
-        
-        let x = Int(round(call.getFloat("x", Float(0))))
-        let y = Int(round(call.getFloat("y", Float(topPadding))))
-        let width = Int(round(call.getFloat("width", Float(screenSize.width))))
-        let height = Int(round(call.getFloat("height", Float(screenSize.width * (9.0 / 16.0)))))
-//        self.playerView.playerLayer.zPosition = -1
-        self.playerView.frame = CGRectMake(0 , 0, self.viewController.view.frame.width, self.viewController.view.frame.height)
-//        self.playerView.frame = CGRect(
-//            x: x,
-//            y: y,
-//            width: width,
-//            height: height
-//        )
-        
-        print("CapacitorIVSPlayer _setFrame x:\(x) y:\(y) width:\(width) height:\(height) done")
-        return true
-    }
-    
-    @objc func setFrame(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setFrame x y")
-        DispatchQueue.main.async {
-            if self._setFrame(options) {
-                resolve(true)
-            } else {
-                reject("failed", "Unable to _setFrame", nil)
-            }
-        }
-        resolve(true)
-    }
-    
-    @objc func _setPlayerPosition(toBack: Bool) -> Bool {
-        self.toBack = toBack
-        if toBack {
-            self.viewController.view.backgroundColor = UIColor.clear
-            self.viewController.view.isOpaque = false
-            //            self.viewController.view.scrollView.backgroundColor = UIColor.clear
-            //            self.viewController.view.scrollView.isOpaque = false
-        } else {
-            guard let viewController = viewController.view else {
-                return false
-            }
-            viewController.bringSubviewToFront(self.playerView)
-        }
-        print("CapacitorIVSPlayer _setPlayerPosition done")
-        return true
-    }
-    
-    @objc func setPlayerPosition(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setPlayerPosition")
-        let call = CAPPluginCall(options: options)
-        let toBack = call.getBool("toBack", false)
-        DispatchQueue.main.async {
-            if self._setPlayerPosition(toBack: toBack) {
-                resolve(true)
-            } else {
-                reject("failed", "Unable to _setPlayerPosition", nil)
-            }
-        }
-    }
-    
-    @objc func getPlayerPosition(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        resolve(["toBack": self.toBack])
     }
     
     @objc func _setBackgroundState(backgroundState: String) -> Bool {
@@ -664,13 +634,13 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         } else {
             return false
         }
-        print("CapacitorIVSPlayer _setBackgroundState done")
+        print("ReactNativeIVSPlayer _setBackgroundState done")
         return true
     }
     
     @objc func setBackgroundState(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer setBackgroundState")
-        let call = CAPPluginCall(options: options)
+        print("ReactNativeIVSPlayer setBackgroundState")
+        let call = PluginArgs(options: options)
         let backgroundState: String = call.getString("backgroundState", "PAUSED")
         DispatchQueue.main.async {
             if self._setBackgroundState(backgroundState: backgroundState)  {
@@ -692,7 +662,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             self.createAvPlayer(url: u)
             self.avPlayer?.play()
         }
-        print("CapacitorIVSPlayer loadUrl")
+        print("ReactNativeIVSPlayer loadUrl")
     }
     
     public func cyclePlayer(prevUrl: String, nextUrl: String) -> Bool {
@@ -708,7 +678,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func cast(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer cast")
+        print("ReactNativeIVSPlayer cast")
         
         DispatchQueue.main.async {
             if !self.isCastActive {
@@ -738,12 +708,12 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func getCastStatus(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer getCastStatus")
+        print("ReactNativeIVSPlayer getCastStatus")
         resolve(["isActive": isCastActive])
     }
     
     @objc func create(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         let playbackRate = call.getFloat("playbackRate", 1.0)
         
         if (self.player.playbackRate != playbackRate && playbackRate >= 0.5 && playbackRate <= 2.0) {
@@ -754,31 +724,34 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         
         let url = call.getString("url", "")
         autoPlay = call.getBool("autoPlay", false)
-        toBack = call.getBool("toBack", false)
         DispatchQueue.main.async {
             let title = call.getString("title", "")
             let subTitle = call.getString("subtitle", "")
             let cover = call.getString("cover", "")
+            let zoom = call.getBool("zoom", false)
             let _options = options;
             self.setupNowPlayingInfo(title: title, subTitle: subTitle, url: cover)
             self.setupRemoteTransportControls()
             let setupDone = self.cyclePlayer(prevUrl: self.player.path?.absoluteString ?? "", nextUrl: url)
-            print("CapacitorIVSPlayer setupDone \(setupDone)")
+            print("ReactNativeIVSPlayer setupDone \(setupDone)")
             self._setPip(options)
-            let FrameDone = self._setFrame(_options)
-            let PlayerPositionDone = self._setPlayerPosition(toBack: self.toBack)
-            if setupDone && FrameDone && PlayerPositionDone {
+            
+            if (zoom) {
+                self.playerView.setupZoomGestures()
+                print("ReactNativeIVSPlayer zoom setup is done")
+            }
+            if setupDone {
                 self.isClosed = false
-                print("CapacitorIVSPlayer success create")
+                print("ReactNativeIVSPlayer success create")
                 resolve(true)
             } else {
-                reject("failed", "Unable to cyclePlayer \(setupDone) or _setFrame \(FrameDone) or _setPlayerPosition \(PlayerPositionDone)", nil)
+                reject("failed", "Unable to cyclePlayer \(setupDone)", nil)
             }
         }
     }
     
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-        print("CapacitorIVSPlayer restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
+        print("ReactNativeIVSPlayer restoreUserInterfaceForPictureInPictureStopWithCompletionHandler")
         // The user tapped the "restore" button in PiP mode, set the flag to true
         // But first we need to fire the expandPip event so the frontend can prepare the UI
         self.notifyListeners("expandPip", data: [:])
@@ -788,15 +761,15 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        print("CapacitorIVSPlayer didRestorePiP \(self.didRestorePiP)")
+        print("ReactNativeIVSPlayer didRestorePiP \(self.didRestorePiP)")
         if self.didRestorePiP {
             // This was a restore from PiP
             self.didRestorePiP = false
-            print("CapacitorIVSPlayer expandPip done")
+            print("ReactNativeIVSPlayer expandPip done")
         } else {
             // This was a close PiP
             self.notifyListeners("closePip", data: [:])
-            print("CapacitorIVSPlayer closePip done")
+            print("ReactNativeIVSPlayer closePip done")
         }
     }
     
@@ -820,7 +793,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         self.pipController = pipController
         pipController.delegate = self
         pipController.canStartPictureInPictureAutomaticallyFromInline = true
-        print("CapacitorIVSPlayer preparePictureInPicture done")
+        print("ReactNativeIVSPlayer preparePictureInPicture done")
     }
     
     @objc func getUrl(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
@@ -837,7 +810,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func pause(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer pause")
+        print("ReactNativeIVSPlayer pause")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 self.avPlayer?.pause()
@@ -849,7 +822,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func start(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer start")
+        print("ReactNativeIVSPlayer start")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 self.avPlayer?.play()
@@ -861,7 +834,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func delete(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        print("CapacitorIVSPlayer delete")
+        print("ReactNativeIVSPlayer delete")
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 self.avPlayer?.pause()
@@ -891,7 +864,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func seekTo(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         let givenPos = Int64(call.getFloat("position", -1.0))
         
         if givenPos != -1 {
@@ -915,7 +888,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func setPlaybackRate(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         let givenRate: Float = call.getFloat("playbackRate") ?? 1.0
         
         if (givenRate < 0.5 || givenRate > 2.0) {
@@ -957,7 +930,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func updatePlayerSrcUrl(_ options: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        let call = CAPPluginCall(options: options)
+        let call = PluginArgs(options: options)
         let callSrc = call.getString("url", "")
         
         if callSrc == "" {
