@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 export * from './definitions';
 import type { ReactNativeIvsPlayerPlugin } from './definitions';
-import React, { useImperativeHandle, useRef } from 'react';
+import React, { useEffect, useImperativeHandle, useRef } from 'react';
 
 const { IvsPlayerViewManager } = NativeModules;
 
@@ -46,6 +46,11 @@ const IvsPlayer = React.forwardRef<
 >((props, ref) => {
   const nativeRef = useRef(null);
   useImperativeHandle(ref, () => ReactNativeIvsPlayer);
+  useEffect(() => {
+    return () => {
+      ReactNativeIvsPlayer.delete();
+    };
+  }, []);
   return <IvsPlayerView {...props} ref={nativeRef} />;
 });
 
