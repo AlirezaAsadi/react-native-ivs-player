@@ -300,6 +300,10 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         return self.viewController.view
     }
     
+    deinit {
+        self._delete()
+    }
+    
     public func notifyListeners(_ withName: String, data: [String: Any]?) {
         event.sendEvent(withName: withName, body: data)
     }
@@ -833,8 +837,13 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         resolve(true)
     }
     
-    @objc func delete(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func _delete() {
         print("ReactNativeIVSPlayer delete")
+        
+        // Close pip before deleting
+        self._setPip(["pip": false])
+        
+        // Stop player
         DispatchQueue.main.async {
             if self.isCastActive && (self.avPlayer != nil) {
                 self.avPlayer?.pause()
@@ -843,6 +852,10 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
                 self.player.load(nil)
             }
         }
+    }
+    
+    @objc func delete(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        self._delete()
         resolve(true)
     }
     
