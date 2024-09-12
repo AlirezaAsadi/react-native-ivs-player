@@ -56,6 +56,7 @@ import com.amazonaws.ivs.player.Player.State
 import com.amazonaws.ivs.player.PlayerException
 import com.amazonaws.ivs.player.PlayerView
 import com.amazonaws.ivs.player.Quality
+import com.amazonaws.ivs.player.ResizeMode
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
@@ -205,11 +206,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                         togglePip(true)
                     }
                     Log.i("ReactNativeIVSPlayer", "didWorked")
-                    _setPip(true, false)
                 }
             }
         }
     }
+
 
     private fun togglePip(pip: Boolean) {
         Log.i("ReactNativeIVSPlayer", "togglePip new pip status is $pip")
@@ -219,17 +220,19 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
         if (!pip) {
             mainPiPFrameLayout?.visibility = View.GONE
-
-            val parentLayoutView = PlayerViewShared.parentLayout;// currentActivity?.findViewById<ViewGroup>(PlayerViewShared.parentLayoutId)
+            val parentLayoutView = PlayerViewShared.parentLayout
             if (mPlayerView?.parent == null) {
-                parentLayoutView?.addView(mPlayerView);
-                _setFrameMatchParent()
+                parentLayoutView?.addView(mPlayerView, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+
+                mPlayerView?.requestLayout()
             }
 
             sendEvent("expandPip")
         } else {
             mainPiPFrameLayout?.visibility = View.VISIBLE
-
             if (mPlayerView?.parent == null) {
                 (mainPiPFrameLayout as ViewGroup).addView(mPlayerView)
             }
@@ -301,7 +304,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                         Log.i("ReactNativeIVSPlayer", "Closing ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
                         // But only turn it off, as turning on is already triggered by setPip
                         if (!pictureInPictureModeChangedInfo.isInPictureInPictureMode) {
-                            togglePip(false)
+                            activity.runOnUiThread {
+                                togglePip(false)
+                            }
                         }
                     }
                     else -> {
@@ -442,6 +447,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
             }
+            mainPiPFrameLayout.visibility = View.GONE
 
             val finalMainPiPFrameLayout = mainPiPFrameLayout
 
@@ -924,10 +930,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
         currentActivity?.runOnUiThread {
             cyclePlayer(prevContentUrl, url)
-            _setFrame(x, y, width, height)
-            mPlayerView?.clipToOutline = false
-            _setPlayerPosition(toBack)
-            _setPip(call.getBoolean("pip", false), false)
         }
     }
 
@@ -1031,7 +1033,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             setDisplayPipButton(false)
             mPlayerView?.player?.pause()
             mPlayerView?.clipToOutline = false
-            _setPip(false, true)
 
             val ret: WritableNativeMap = WritableNativeMap()
             sendEvent("closePip", ret)
@@ -1058,6 +1059,17 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         setDisplayPipButton(false)
     }
 
+//    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+//    fun setRoundedCorners(view: View, radius: Float) {
+//        view.clipToOutline = true
+//        view.outlineProvider = object : ViewOutlineProvider() {
+//            override fun getOutline(view: View, outline: Outline) {
+//                Log.i("ReactNativeIVSPlayer", "setRoundedCorners ${view.width} x ${view.height}...")
+//                outline.setRoundRect(0, 0, view.width, view.height, radius)
+//            }
+//        }
+//    }
+
     @SuppressLint("ClickableViewAccessibility")
     @ReactMethod
     public fun setupUI() {
@@ -1070,6 +1082,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
             mPlayerView = PlayerViewShared.mPlayerView as PlayerView;
+            PlayerViewShared.parentLayout = mPlayerView?.parent as ViewGroup
             mPlayerView?.requestFocus();
             mPlayerView?.setControlsEnabled(false);
 
@@ -1086,7 +1099,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             gestureDetector =
                 GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
                     override fun onDoubleTap(e: MotionEvent): Boolean {
-                        toggleFullScreen()
+//                        toggleFullScreen()
                         return true
                     }
                 })
@@ -1096,6 +1109,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     override fun onScale(detector: ScaleGestureDetector): Boolean {
                         // Handle scale gestures if needed
+                        Log.i("ReactNativeIVSPlayer", "XX3...")
                         return true
                     }
                 })
@@ -1241,7 +1255,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         mPlayerView?.player?.pause()
     }
 
-    @ReactMethod
     fun _delete() {
         Log.i("ReactNativeIVSPlayer", "_delete")
         currentActivity?.runOnUiThread {
@@ -1257,8 +1270,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    @ReactMethod
     fun delete(promise: Promise) {
-        Log.i("ReactNativeIVSPlayer", "_delete")
+        Log.i("ReactNativeIVSPlayer", "delete")
         _delete()
         promise.resolve(true)
     }
@@ -1314,13 +1328,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         promise.resolve(ret)
     }
 
-    private fun setAutoHideDisplayButton() {
-        setDisplayPipButton(true)
-        val handler = Handler()
-        handler.postDelayed({
-            setDisplayPipButton(false)
-        }, 3000)
-    }
 
     private fun setDisplayPipButton(displayPipButton: Boolean) {
         Log.i("ReactNativeIVSPlayer", "setDisplayPipButton displayPipButton: $displayPipButton, currentStateDisplayButton: $currentStateDisplayButton")
@@ -1351,30 +1358,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         animation.duration = 500
         view.visibility = visibility
         view.startAnimation(animation)
-    }
-
-    private fun toggleFullScreen() {
-        Log.i("ReactNativeIVSPlayer", "toggleFullScreen: $isFullScreen")
-        val x = mPlayerView?.left ?: 0
-        val y = mPlayerView?.top ?: 0
-
-        if (isFullScreen) {
-            val halfScreenSizeX = size.x / 2
-            animateResize(
-                mPlayerView?.width ?: 0, mPlayerView?.height ?: 0,
-                halfScreenSizeX, calcHeight(halfScreenSizeX),
-                x, y, x, y
-            )
-        } else {
-            val newPlayerSizeX = calcHeight(size.x)
-            animateResize(
-                mPlayerView?.width ?: 0, mPlayerView?.height ?: 0,
-                size.x, newPlayerSizeX,
-                x, y, x, y
-            )
-        }
-
-        isFullScreen = !isFullScreen
     }
 
     private fun animateResize(
@@ -1412,89 +1395,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         animatorSet.start()
     }
 
-    fun makeFloating() {
-        Log.i("ReactNativeIVSPlayer", "makeFloating")
-        mPlayerView?.clipToOutline = true
-
-        /// Show the buttons for 3 seconds
-        setAutoHideDisplayButton()
-
-        // get middile of screen x y
-        getDisplaySize()
-        val halfScreenSizeX = size.x / 2
-        val height = calcHeight(halfScreenSizeX)
-
-        // position the player view at the bottom right corner with a margin of 1/4 of screen
-        val x = size.x - halfScreenSizeX - 30
-        val y = size.y - height - 30
-
-        // get half of width and calculate height
-        _setFrame(x, y, halfScreenSizeX, height, true)
-
-        val ret = WritableNativeMap()
-        sendEvent("startPip", ret)
-    }
-
-    private fun _setPlayerPosition(toBack: Boolean) {
-        Log.i("ReactNativeIVSPlayer", "_setPlayerPosition toBack: $toBack")
-        currentActivity?.runOnUiThread {
-            val webView = mPlayerView
-//            val webView = currentActivity?.findViewById<ViewGroup>(android.R.id.content)
-            val mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
-
-            mainPiPFrameLayout?.setBackgroundColor(Color.parseColor("#00000000"))
-
-            if (toBack) {
-                (webView?.parent as ViewGroup?)?.bringChildToFront(webView)
-                webView?.setBackgroundColor(0x00000000)
-            } else {
-                webView?.setBackgroundColor(0x000000)
-                if (webView != null && mainPiPFrameLayout != null) {
-                    Log.i("ReactNativeIVSPlayer", "_setPlayerPosition INSIDE!:")
-                    (webView.parent as ViewGroup?)?.bringChildToFront(mainPiPFrameLayout)
-                }
-            }
-        }
-    }
-
-    @ReactMethod
-    fun setPlayerPosition(options: ReadableMap, promise: Promise) {
-        val call = DefaultReadableMap(options)
-        this.toBack = call.getBoolean("toBack", false)
-        _setPlayerPosition(toBack)
-        promise.resolve(true)
-    }
-
-    @ReactMethod
-    fun getPlayerPosition(options: ReadableMap, promise: Promise) {
-        val call = DefaultReadableMap(options)
-        val ret = WritableNativeMap().apply {
-            putBoolean("toBack", toBack)
-        }
-        promise.resolve(ret)
-    }
-
-    fun _setPip(pip: Boolean, foregroundApp: Boolean) {
-        Log.i("ReactNativeIVSPlayer", "_setPip pip: $pip")
-        currentActivity?.runOnUiThread {
-            Log.i("ReactNativeIVSPlayer", "foregroundApp: $foregroundApp pip: $pip")
-            // No usage of foreground in the new RN plugin
-            /*if (foregroundApp) {
-                _setPlayerPosition(!pip)
-                if (pip) {
-                    makeFloating()
-                }
-            } else*/
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (pip) {
-                    mPlayerView?.clipToOutline = false
-//                    setDisplayPipButton(false)
-                    _setFrameMatchParent()
-                }
-            }
-        }
-    }
-
     @ReactMethod
     fun setPip(options: ReadableMap, promise: Promise) {
         val call = DefaultReadableMap(options)
@@ -1502,47 +1402,12 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         Log.i("ReactNativeIVSPlayer", "setPip pip: $pip")
 
         if (pip) {
-            enterPipMode();
-        }
-
-        currentActivity?.runOnUiThread {
-            if (!getIsCastSessionActive()) {
-                _setPip(pip, false)
-            }
+//            if (!getIsCastSessionActive()) {
+                enterPipMode();
+//            }
         }
 
         promise.resolve(true)
-    }
-
-    private fun _setFrame(x: Int, y: Int, width: Int, height: Int) {
-        _setFrame(x, y, width, height, false)
-    }
-
-    private fun _setFrame(x: Int, y: Int, width: Int, height: Int, forceSetFrame: Boolean) {
-        if (isAppInPiPMode() && !forceSetFrame) return
-
-        currentActivity?.runOnUiThread {
-            playerViewParams = FrameLayout.LayoutParams(width, height).apply {
-                gravity = Gravity.TOP or Gravity.END // Positioning the view
-                setMargins(x, y, 0, 0) // Adjust the margins to control placement
-            }
-            Log.i("ReactNativeIVSPlayer", "_setFrame $width x $height")
-            playerViewParams?.setMargins(x, y, 0, 0)
-            mPlayerView?.setBackgroundColor(Color.RED) // Just for visualization
-            mPlayerView?.layoutParams = playerViewParams
-        }
-    }
-
-    private fun _setFrameMatchParent() {
-        Log.i("ReactNativeIVSPlayer", "_setFrameMatchParent")
-        currentActivity?.runOnUiThread {
-            playerViewParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            playerViewParams?.setMargins(0, 0, 0, 0)
-            mPlayerView?.layoutParams = playerViewParams
-        }
     }
 
     fun convertDpToPixel(dp: Float): Float {
@@ -1551,34 +1416,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     fun convertPixelsToDp(px: Float): Float {
         return px / (getContext().resources.displayMetrics.densityDpi.toFloat() / DisplayMetrics.DENSITY_DEFAULT)
-    }
-
-    @ReactMethod
-    fun setFrame(options: ReadableMap, promise: Promise) {
-        val call = DefaultReadableMap(options)
-        Log.i("ReactNativeIVSPlayer", "setFrame")
-        currentActivity?.runOnUiThread {
-            getDisplaySize()
-            val x = convertDpToPixel(call.getDouble("x", 0.0).toFloat()).toInt()
-            val y = convertDpToPixel(call.getDouble("y", 0.0).toFloat()).toInt()
-            val width = convertDpToPixel(call.getDouble("width", convertPixelsToDp(size.x.toFloat()).toDouble()).toFloat()).toInt()
-            val height = convertDpToPixel(call.getDouble("height", convertPixelsToDp(calcHeight(size.x).toFloat()).toDouble()).toFloat()).toInt()
-            _setFrame(x, y, width, height)
-            promise.resolve(true)
-        }
-    }
-
-    @ReactMethod
-    fun getFrame(promise: Promise) {
-        val layoutParams = mPlayerView?.layoutParams as FrameLayout.LayoutParams
-
-        val ret = WritableNativeMap().apply {
-            putInt("x", layoutParams.leftMargin)
-            putInt("y", layoutParams.topMargin)
-            putInt("width", layoutParams.width)
-            putInt("height", layoutParams.height)
-        }
-        promise.resolve(ret)
     }
 
     @ReactMethod
