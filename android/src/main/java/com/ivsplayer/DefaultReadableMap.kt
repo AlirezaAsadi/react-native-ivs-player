@@ -54,5 +54,4 @@ class DefaultReadableMap(private val readableMap: ReadableMap) {
         }
     }
 
-    // Add more methods as needed to handle other types
 }
