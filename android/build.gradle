@@ -1,3 +1,10 @@
+ext {
+  junitVersion = project.hasProperty('junitVersion') ? rootProject.ext.junitVersion : '4.13.2'
+  androidxAppCompatVersion = project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.6.1'
+  androidxJunitVersion = project.hasProperty('androidxJunitVersion') ? rootProject.ext.androidxJunitVersion : '1.1.5'
+  androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.5.1'
+}
+
 buildscript {
   // Buildscript is evaluated before everything else so we can't use getExtOrDefault
   def kotlin_version = rootProject.ext.has("kotlinVersion") ? rootProject.ext.get("kotlinVersion") : project.properties["IvsPlayer_kotlinVersion"]
@@ -94,6 +101,13 @@ dependencies {
   // For > 0.71, this will be replaced by `com.facebook.react:react-android:$version` by react gradle plugin
   //noinspection GradleDynamicVersion
   implementation "com.facebook.react:react-native:+"
+  implementation 'com.google.android.material:material:1.9.0'
+  implementation 'com.amazonaws:ivs-player:1.22.0'
+  implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
+  implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+  implementation 'androidx.mediarouter:mediarouter:1.2.5'
+  implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.5.1"
+  implementation 'com.google.android.gms:play-services-cast-framework:21.3.0'
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
 
