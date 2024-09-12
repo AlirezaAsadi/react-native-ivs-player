@@ -19,27 +19,6 @@ class IvsPlayerViewManager : SimpleViewManager<View>() {
 
   @SuppressLint("ClickableViewAccessibility")
   override fun createViewInstance(reactContext: ThemedReactContext): View {
-//    val frameLayout = FrameLayout(reactContext).apply {
-//      // Apply the Layout Parameters to frameLayout
-//      layoutParams = FrameLayout.LayoutParams(
-//        FrameLayout.LayoutParams.MATCH_PARENT,
-//        FrameLayout.LayoutParams.MATCH_PARENT
-//      )
-//    }
-//    val playerView = PlayerView(reactContext)
-//    playerView.layoutParams = FrameLayout.LayoutParams(
-//      FrameLayout.LayoutParams.MATCH_PARENT,
-//      FrameLayout.LayoutParams.MATCH_PARENT
-//    )
-//
-//    // Set the player view in the singleton
-//    PlayerViewShared.mPlayerView = playerView
-//    PlayerViewShared.parentLayout = frameLayout
-//
-//    frameLayout.removeView(playerView)
-//    frameLayout.addView(playerView)
-//    frameLayout.setBackgroundColor(Color.YELLOW)
-
     val playerView = PlayerView(reactContext)
 
     // Ensure that PlayerView fills the parent
