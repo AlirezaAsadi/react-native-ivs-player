@@ -716,7 +716,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
         } else {
             if (mPlayerView != null) {
-                mPlayerView!!.player.state
+                mPlayerView?.player?.state ?: State.IDLE
             } else {
                 State.IDLE
             }.also {
@@ -923,24 +923,24 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             throw IllegalStateException("streamId is empty")
         }
 
-        mMediaMetadata!!.putString(METADATA_KEY_STREAM_ID, streamId)
+        mMediaMetadata?.putString(METADATA_KEY_STREAM_ID, streamId)
         Log.d(TAG, "streamId: $streamId")
 
-        mMediaMetadata!!.putString(METADATA_KEY_CHANNEL_SLUG, channelSlug)
+        mMediaMetadata?.putString(METADATA_KEY_CHANNEL_SLUG, channelSlug)
         Log.d(TAG, "channelSlug: $channelSlug")
 
         Log.d(TAG, "title: $title")
-        mMediaMetadata!!.putString(MediaMetadata.KEY_TITLE, title)
+        mMediaMetadata?.putString(MediaMetadata.KEY_TITLE, title)
 
         Log.d(TAG, "description: $description")
-        mMediaMetadata!!.putString(MediaMetadata.KEY_SUBTITLE, description)
+        mMediaMetadata?.putString(MediaMetadata.KEY_SUBTITLE, description)
 
         if (thumbnailUrl.isEmpty()) {
             Log.w(TAG, "thumbnailUrl is empty")
         } else {
             val thumbnailUri = Uri.parse(thumbnailUrl)
             val thumbnailImage = WebImage(thumbnailUri)
-            mMediaMetadata!!.addImage(thumbnailImage)
+            mMediaMetadata?.addImage(thumbnailImage)
 
             Log.w(TAG, "thumbnailUrl: $thumbnailUrl")
         }
@@ -989,7 +989,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             topMargin = marginButton
             rightMargin = marginButton
         }
-        closeButton!!.layoutParams = closeButtonParams
+        closeButton?.layoutParams = closeButtonParams
 
         val playPauseButtonParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -997,7 +997,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         ).apply {
             gravity = Gravity.CENTER
         }
-        playPauseButton!!.layoutParams = playPauseButtonParams
+        playPauseButton?.layoutParams = playPauseButtonParams
 
         expandButton?.setOnClickListener {
             Log.d(TAG, "expandButton?.setOnClickListener")
@@ -1149,29 +1149,32 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     private fun setupMediaRouteButton() {
-        mediaRouteButton = MediaRouteButton(currentActivity!!).apply {
-            visibility = View.GONE
-        }
-
-        CastButtonFactory.setUpMediaRouteButton(
-            currentActivity?.applicationContext!!,
-            mediaRouteButton!!
-        )
-
-        val params = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.END
-        }
-
-        currentActivity?.addContentView(mediaRouteButton, params)
-
-        mediaRouteButton?.setDialogFactory(object : MediaRouteDialogFactory() {
-            override fun onCreateChooserDialogFragment(): MediaRouteChooserDialogFragment {
-                return VideoMediaRouteChooserDialogFragment()
+        currentActivity?.let {
+            mediaRouteButton = MediaRouteButton(it).apply {
+                visibility = View.GONE
             }
-        })
+
+            CastButtonFactory.setUpMediaRouteButton(
+                it.applicationContext,
+                mediaRouteButton!!
+            )
+
+            val params = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+            }
+
+            currentActivity?.addContentView(mediaRouteButton, params)
+
+            mediaRouteButton?.setDialogFactory(object : MediaRouteDialogFactory() {
+                override fun onCreateChooserDialogFragment(): MediaRouteChooserDialogFragment {
+                    return VideoMediaRouteChooserDialogFragment()
+                }
+            })
+        }
+
     }
 
 //    private fun setupRouteManager() {
@@ -1309,21 +1312,22 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         if (currentStateDisplayButton == displayPipButton) return
 
         if (displayPipButton) {
-            fadeAnimation(shadowView!!, View.VISIBLE)
-            fadeAnimation(expandButton!!, View.VISIBLE)
-            fadeAnimation(closeButton!!, View.VISIBLE)
-            fadeAnimation(playPauseButton!!, View.VISIBLE)
+            fadeAnimation(shadowView, View.VISIBLE)
+            fadeAnimation(expandButton, View.VISIBLE)
+            fadeAnimation(closeButton, View.VISIBLE)
+            fadeAnimation(playPauseButton, View.VISIBLE)
             currentStateDisplayButton = true
         } else {
-            fadeAnimation(shadowView!!, View.GONE)
-            fadeAnimation(expandButton!!, View.GONE)
-            fadeAnimation(closeButton!!, View.GONE)
-            fadeAnimation(playPauseButton!!, View.GONE)
+            fadeAnimation(shadowView, View.GONE)
+            fadeAnimation(expandButton, View.GONE)
+            fadeAnimation(closeButton, View.GONE)
+            fadeAnimation(playPauseButton, View.GONE)
             currentStateDisplayButton = false
         }
     }
 
-    private fun fadeAnimation(view: View, visibility: Int) {
+    private fun fadeAnimation(view: View?, visibility: Int) {
+        if (view == null) return;
         val animation = if (visibility == View.VISIBLE) {
             AlphaAnimation(0f, 1f)
         } else {
