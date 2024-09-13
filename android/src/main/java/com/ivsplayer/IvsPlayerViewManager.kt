@@ -1,18 +1,13 @@
 package com.ivsplayer
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.graphics.Color
-import android.util.Log
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import com.amazonaws.ivs.player.PlayerView
 import com.amazonaws.ivs.player.ResizeMode
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
-import com.facebook.react.uimanager.annotations.ReactProp
 
 class IvsPlayerViewManager : SimpleViewManager<View>() {
   override fun getName() = "IvsPlayerView"
@@ -27,7 +22,7 @@ class IvsPlayerViewManager : SimpleViewManager<View>() {
       ViewGroup.LayoutParams.MATCH_PARENT
     )
     playerView.resizeMode = ResizeMode.FIT;
-    PlayerViewShared.mPlayerView = playerView
+    PlayerViewShared.playerView = playerView
     playerView.setBackgroundColor(Color.BLACK)
 
     return playerView

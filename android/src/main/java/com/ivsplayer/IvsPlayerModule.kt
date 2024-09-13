@@ -4,19 +4,14 @@ import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AppOpsManager
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Outline
-import android.graphics.PixelFormat
 import android.graphics.Point
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.Process
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.Rational
@@ -27,24 +22,14 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
-import android.view.WindowManager
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
 import android.widget.ImageView
-import androidx.annotation.ChecksSdkIntAtLeast
-import androidx.annotation.NonNull
-import androidx.annotation.RequiresApi
-import androidx.core.app.PictureInPictureModeChangedInfo
-import androidx.core.util.Consumer
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.AppOpsManagerCompat
-import androidx.core.app.OnPictureInPictureModeChangedProvider
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import androidx.mediarouter.app.MediaRouteButton
 import androidx.mediarouter.app.MediaRouteChooserDialogFragment
 import androidx.mediarouter.app.MediaRouteDialogFactory
@@ -56,8 +41,6 @@ import com.amazonaws.ivs.player.Player.State
 import com.amazonaws.ivs.player.PlayerException
 import com.amazonaws.ivs.player.PlayerView
 import com.amazonaws.ivs.player.Quality
-import com.amazonaws.ivs.player.ResizeMode
-import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -69,7 +52,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import com.facebook.react.uimanager.ThemedReactContext
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadOptions
 import com.google.android.gms.cast.MediaMetadata
@@ -100,6 +82,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private val context: Context = reactContext.applicationContext
     val PLUGIN_VERSION = "0.13.34"
     private var reactContext: ReactApplicationContext? = null
+    private val TAG = "ReactNativeIVSPlayer"
 
 
     private val mainPiPFrameLayoutId = 257
@@ -153,19 +136,19 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     // Implement the lifecycle methods
     override fun onHostResume() {
-        Log.d("ReactNativeIVSPlayer", "onHostResume")
+        Log.d(TAG, "onHostResume")
     }
     override fun onHostDestroy() {
-        Log.d("ReactNativeIVSPlayer", "onHostDestroy")
+        Log.d(TAG, "onHostDestroy")
         handleOnDestroy()
     }
 
     override fun onHostPause() {
-        Log.d("ReactNativeIVSPlayer", "onHostPause")
+        Log.d(TAG, "onHostPause")
     }
 
     fun handleOnDestroy() {
-        Log.d("ReactNativeIVSPlayer", "handleOnDestroy")
+        Log.d(TAG, "handleOnDestroy")
         mPlayerView?.player?.release()
         mPlayerView = null
     }
@@ -173,9 +156,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
 
     fun enterPipMode() {
-        Log.d("ReactNativeIVSPlayer", "onActivityPaused")
+        Log.d(TAG, "onActivityPaused")
         val pipSupported = PictureInPictureUtil.isSupportPictureInPicture(reactApplicationContext)
-        Log.d("ReactNativeIVSPlayer", "onActivityPaused pipSupported: $pipSupported")
+        Log.d(TAG, "onActivityPaused pipSupported: $pipSupported")
 
         mPlayerView?.let {
             if (it.player.state != Player.State.PLAYING) {
@@ -201,7 +184,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     currentActivity?.runOnUiThread {
                         togglePip(true)
                     }
-                    Log.d("ReactNativeIVSPlayer", "didWorked")
+                    Log.d(TAG, "didWorked")
                 }
             }
         }
@@ -209,10 +192,10 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
 
     private fun togglePip(pip: Boolean) {
-        Log.d("ReactNativeIVSPlayer", "togglePip new pip status is $pip")
+        Log.d(TAG, "togglePip new pip status is $pip")
 
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
-        Log.d("ReactNativeIVSPlayer", "pluginView")
+        Log.d(TAG, "pluginView")
         (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
         if (!pip) {
             mainPiPFrameLayout?.visibility = View.GONE
@@ -274,7 +257,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
          * button (which fires the "closePip" event), this gets the "stopPip" name
          */
         sendEvent("stopPip", ret)
-        Log.d("ReactNativeIVSPlayer", "closePip")
+        Log.d(TAG, "closePip")
     }
 
     // Function to calculate 16:9 ratio height
@@ -288,8 +271,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             ?.addOnPictureInPictureModeChangedListener { pictureInPictureModeChangedInfo ->
                 val lifecycleState = activity.lifecycle.currentState
                 val ret = WritableNativeMap()
-                Log.d("ReactNativeIVSPlayer", "lifecycleState is $lifecycleState")
-                Log.d("ReactNativeIVSPlayer", "isInPictureInPictureMode is ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
+                Log.d(TAG, "lifecycleState is $lifecycleState")
+                Log.d(TAG, "isInPictureInPictureMode is ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
                 when (lifecycleState) {
                     Lifecycle.State.CREATED -> {
                         //when user click on Close button of PIP this will trigger.
@@ -297,7 +280,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     }
                     Lifecycle.State.STARTED -> {
                         //when PIP maximize this will trigger
-                        Log.d("ReactNativeIVSPlayer", "Closing ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
+                        Log.d(TAG, "Closing ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
                         // But only turn it off, as turning on is already triggered by setPip
                         if (!pictureInPictureModeChangedInfo.isInPictureInPictureMode) {
                             activity.runOnUiThread {
@@ -328,15 +311,15 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     val mainPiPFrameLayout =
                         currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
                     mainPiPFrameLayout?.addView(mPlayerView)
-                    Log.d("ReactNativeIVSPlayer", "mainPiPFrameLayout")
+                    Log.d(TAG, "mainPiPFrameLayout")
                 }
 
-                Log.d("ReactNativeIVSPlayer", "addPlayerListener.onStateChanged, state: $state")
+                Log.d(TAG, "addPlayerListener.onStateChanged, state: $state")
                 notifyPlayerStatus()
             }
 
             override fun onCue(cue: Cue) {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onCue: $cue")
+                Log.d(TAG, "Player.Listener.onCue: $cue")
                 val ret = WritableNativeMap().apply {
                     putString("cue", cue.toString()) // Assuming cue is converted to string
                 }
@@ -344,7 +327,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onDurationChanged(duration: Long) {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onDurationChanged: $duration")
+                Log.d(TAG, "Player.Listener.onDurationChanged: $duration")
                 val ret = WritableNativeMap().apply {
                     putDouble("duration", duration.toDouble())
                 }
@@ -352,7 +335,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onError(exception: PlayerException) {
-                Log.e("ReactNativeIVSPlayer", "Player.Listener.onError: $exception")
+                Log.e(TAG, "Player.Listener.onError: $exception")
                 val ret = WritableNativeMap().apply {
                     putString(
                         "error",
@@ -363,13 +346,13 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onRebuffering() {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onRebuffering")
+                Log.d(TAG, "Player.Listener.onRebuffering")
                 val ret = WritableNativeMap()
                 sendEvent("onRebuffering", ret)
             }
 
             override fun onSeekCompleted(time: Long) {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onSeekCompleted: $time")
+                Log.d(TAG, "Player.Listener.onSeekCompleted: $time")
                 val ret = WritableNativeMap().apply {
                     putDouble("position", time / 1000.0)
                 }
@@ -377,7 +360,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onVideoSizeChanged(width: Int, height: Int) {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onVideoSizeChanged: ${width}x$height")
+                Log.d(TAG, "Player.Listener.onVideoSizeChanged: ${width}x$height")
                 val ret = WritableNativeMap().apply {
                     putInt("width", width)
                     putInt("height", height)
@@ -386,7 +369,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onQualityChanged(quality: Quality) {
-                Log.d("ReactNativeIVSPlayer", "Player.Listener.onQualityChanged: $quality")
+                Log.d(TAG, "Player.Listener.onQualityChanged: $quality")
                 val ret = WritableNativeMap().apply {
                     putString(
                         "quality",
@@ -406,20 +389,20 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             loadCastSessionMedia(castSession)
             notifyCastStatus()
         } else {
-            Log.d("ReactNativeIVSPlayer", "loadUrl: $contentUrl")
+            Log.d(TAG, "loadUrl: $contentUrl")
             mPlayerView?.player?.load(Uri.parse(contentUrl))
         }
     }
 
     fun cyclePlayer(prevContentUrl: String, nextUrl: String) {
         var mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
-        Log.d("ReactNativeIVSPlayer", "cyclePlayer mainPiPFrameLayout: $mainPiPFrameLayout")
+        Log.d(TAG, "cyclePlayer mainPiPFrameLayout: $mainPiPFrameLayout")
 
         if (mainPiPFrameLayout != null) {
-            Log.d("ReactNativeIVSPlayer", "FrameLayout for VideoPicker already exists")
+            Log.d(TAG, "FrameLayout for VideoPicker already exists")
 
             if (mPlayerView?.parent != null) {
-                Log.d("ReactNativeIVSPlayer", "playerView is already in mainPiPFrameLayout")
+                Log.d(TAG, "playerView is already in mainPiPFrameLayout")
                 // check if playerView is already in mainPiPFrameLayout
                 if (prevContentUrl == nextUrl) {
                     loadUrl(nextUrl)
@@ -428,7 +411,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 mainPiPFrameLayout.removeView(mPlayerView)
                 loadUrl(nextUrl)
             } else {
-                Log.d("ReactNativeIVSPlayer", "playerView is not in mainPiPFrameLayout")
+                Log.d(TAG, "playerView is not in mainPiPFrameLayout")
                 // add playerView to mainPiPFrameLayout
                 mainPiPFrameLayout.addView(mPlayerView)
                 loadUrl(nextUrl)
@@ -469,18 +452,18 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     private val remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
         override fun onStatusUpdated() {
-            Log.d("ReactNativeIVSPlayer", "RemoteMediaClient.Callback.onStatusUpdated")
+            Log.d(TAG, "RemoteMediaClient.Callback.onStatusUpdated")
             notifyCastStatus()
         }
     }
 
     private fun loadCastSessionMedia(castSession: CastSession?) {
         if (castSession == null) {
-            Log.e("ReactNativeIVSPlayer", "loadCastSessionMedia castSession is null")
+            Log.e(TAG, "loadCastSessionMedia castSession is null")
             return
         }
 
-        Log.d("ReactNativeIVSPlayer", "loadCastSessionMedia ${mMediaInfo?.contentUrl}")
+        Log.d(TAG, "loadCastSessionMedia ${mMediaInfo?.contentUrl}")
 
         val mediaLoadOptions = MediaLoadOptions.Builder()
             .setAutoplay(true)
@@ -491,9 +474,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             ?.load(mMediaInfo as MediaInfo, mediaLoadOptions)
             ?.setResultCallback { result ->
                 if (result.status.isSuccess) {
-                    Log.d("ReactNativeIVSPlayer", "Media loaded successfully")
+                    Log.d(TAG, "Media loaded successfully")
                 } else {
-                    Log.e("ReactNativeIVSPlayer", "Error loading media: ${result.status.statusCode}")
+                    Log.e(TAG, "Error loading media: ${result.status.statusCode}")
                 }
             }
 
@@ -517,16 +500,16 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onSessionStarting(castSession: CastSession) {
-                Log.d("ReactNativeIVSPlayer", "cast onSessionStarting")
+                Log.d(TAG, "cast onSessionStarting")
                 notifyCastStatus()
             }
 
             override fun onSessionSuspended(castSession: CastSession, reason: Int) {
-                Log.d("ReactNativeIVSPlayer", "SessionManagerListener.onSessionSuspended: $castSession")
+                Log.d(TAG, "SessionManagerListener.onSessionSuspended: $castSession")
             }
 
             override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
-                Log.d("ReactNativeIVSPlayer", "SessionManagerListener.onSessionResumed: $session")
+                Log.d(TAG, "SessionManagerListener.onSessionResumed: $session")
                 notifyCastStatus()
             }
 
@@ -557,7 +540,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             override fun onSessionEnding(castSession: CastSession) {
-                Log.d("ReactNativeIVSPlayer", "SessionManagerListener.onSessionEnding: $castSession")
+                Log.d(TAG, "SessionManagerListener.onSessionEnding: $castSession")
 
                 castSession.remoteMediaClient?.apply {
                     removeProgressListener(progressListener)
@@ -587,7 +570,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    private fun createMediaInfo(contentUrl: String?): MediaInfo {
+    private fun createMediaInfo(contentUrl: String?) {
         val localContentUrl = contentUrl ?: mMediaInfo?.contentUrl
         ?: throw IllegalStateException("contentUrl is null")
 
@@ -602,9 +585,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
         mMediaInfo = mediaInfoBuilder.build()
 
-        Log.d("ReactNativeIVSPlayer", "createMediaInfo ${mMediaInfo?.contentUrl}")
-
-        return mMediaInfo!!
+        Log.d(TAG, "createMediaInfo ${mMediaInfo?.contentUrl}")
     }
 
     @ReactMethod
@@ -621,7 +602,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun cast(promise: Promise) {
-        Log.d("ReactNativeIVSPlayer", "cast")
+        Log.d(TAG, "cast")
         performCastClick()
         promise.resolve(null)
     }
@@ -630,22 +611,22 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         currentActivity?.runOnUiThread {
             val castContext = getCastContext()
 
-            Log.d("ReactNativeIVSPlayer", "CreateCast")
+            Log.d(TAG, "CreateCast")
             if (castContext == null) {
-                Log.d("ReactNativeIVSPlayer", "CastContext is null")
+                Log.d(TAG, "CastContext is null")
             } else {
                 if (castContext.castState == CastState.NO_DEVICES_AVAILABLE) {
-                    Log.d("ReactNativeIVSPlayer", "No devices available for casting")
+                    Log.d(TAG, "No devices available for casting")
                 } else {
-                    Log.d("ReactNativeIVSPlayer", "Devices available for casting")
+                    Log.d(TAG, "Devices available for casting")
                 }
             }
 
             if (getHasVideoCapableRoutes()) {
                 mediaRouteButton?.performClick()
-                Log.d("ReactNativeIVSPlayer", "cast performClick")
+                Log.d(TAG, "cast performClick")
             } else {
-                Log.w("ReactNativeIVSPlayer", "cast NO video capable routes")
+                Log.w(TAG, "cast NO video capable routes")
             }
         }
     }
@@ -664,7 +645,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
         }
 
-        Log.d("ReactNativeIVSPlayer", "getCastPlayerState, state: $castPlayerState")
+        Log.d(TAG, "getCastPlayerState, state: $castPlayerState")
         return castPlayerState
     }
 
@@ -672,14 +653,14 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun getCastStatus(promise: Promise) {
         val castStatusJSObject = getCastStatusJSObject()
 
-        Log.d("ReactNativeIVSPlayer", "getCastStatus: $castStatusJSObject")
+        Log.d(TAG, "getCastStatus: $castStatusJSObject")
         promise.resolve(castStatusJSObject)
     }
 
     private fun notifyCastStatus() {
         val castStatusJSObject = getCastStatusJSObject()
 
-        Log.d("ReactNativeIVSPlayer", "notifyCastStatus: $castStatusJSObject")
+        Log.d(TAG, "notifyCastStatus: $castStatusJSObject")
 
         sendEvent("onCastStatus", castStatusJSObject)
     }
@@ -731,7 +712,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private fun notifyPlayerStatus() {
         val state: State = if (getIsCastSessionActive()) {
             getCastPlayerState().also {
-                Log.d("ReactNativeIVSPlayer", "notifyPlayerStatus from cast: $it")
+                Log.d(TAG, "notifyPlayerStatus from cast: $it")
             }
         } else {
             if (mPlayerView != null) {
@@ -739,7 +720,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             } else {
                 State.IDLE
             }.also {
-                Log.d("ReactNativeIVSPlayer", "notifyPlayerStatus from player view: $it")
+                Log.d(TAG, "notifyPlayerStatus from player view: $it")
             }
         }
 
@@ -756,10 +737,10 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 castSession != null && castSession.isConnected
             }
         } catch (e: ExecutionException) {
-            Log.e("ReactNativeIVSPlayer", "getIsCastSessionActive exception: ${e.message}")
+            Log.e(TAG, "getIsCastSessionActive exception: ${e.message}")
             false
         } catch (e: InterruptedException) {
-            Log.e("ReactNativeIVSPlayer", "getIsCastSessionActive exception: ${e.message}")
+            Log.e(TAG, "getIsCastSessionActive exception: ${e.message}")
             false
         }
     }
@@ -898,7 +879,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         val width = convertDpToPixel(call.getDouble("width", convertPixelsToDp(size.x.toFloat()).toDouble()).toFloat()).toInt()
         val height = convertDpToPixel(call.getDouble("height", convertPixelsToDp(calcHeight(size.x).toFloat()).toDouble()).toFloat()).toInt()
 
-        Log.d("ReactNativeIVSPlayer", "create")
+        Log.d(TAG, "create")
 
         val url = call.getString("url") ?: return promise.reject("url is required")
         val prevContentUrl = mMediaInfo?.contentUrl ?: url
@@ -943,32 +924,32 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         }
 
         mMediaMetadata!!.putString(METADATA_KEY_STREAM_ID, streamId)
-        Log.d("ReactNativeIVSPlayer", "streamId: $streamId")
+        Log.d(TAG, "streamId: $streamId")
 
         mMediaMetadata!!.putString(METADATA_KEY_CHANNEL_SLUG, channelSlug)
-        Log.d("ReactNativeIVSPlayer", "channelSlug: $channelSlug")
+        Log.d(TAG, "channelSlug: $channelSlug")
 
-        Log.d("ReactNativeIVSPlayer", "title: $title")
+        Log.d(TAG, "title: $title")
         mMediaMetadata!!.putString(MediaMetadata.KEY_TITLE, title)
 
-        Log.d("ReactNativeIVSPlayer", "description: $description")
+        Log.d(TAG, "description: $description")
         mMediaMetadata!!.putString(MediaMetadata.KEY_SUBTITLE, description)
 
         if (thumbnailUrl.isEmpty()) {
-            Log.w("ReactNativeIVSPlayer", "thumbnailUrl is empty")
+            Log.w(TAG, "thumbnailUrl is empty")
         } else {
             val thumbnailUri = Uri.parse(thumbnailUrl)
             val thumbnailImage = WebImage(thumbnailUri)
             mMediaMetadata!!.addImage(thumbnailImage)
 
-            Log.w("ReactNativeIVSPlayer", "thumbnailUrl: $thumbnailUrl")
+            Log.w(TAG, "thumbnailUrl: $thumbnailUrl")
         }
     }
 
     private fun getDisplaySize() {
         val display = currentActivity?.windowManager?.defaultDisplay
         display?.getSize(size)
-        Log.d("ReactNativeIVSPlayer", "getDisplaySize: ${size.x}x${size.y}")
+        Log.d(TAG, "getDisplaySize: ${size.x}x${size.y}")
     }
 
     private fun prepareButtonInternalPip() {
@@ -1019,13 +1000,13 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         playPauseButton!!.layoutParams = playPauseButtonParams
 
         expandButton?.setOnClickListener {
-            Log.d("ReactNativeIVSPlayer", "expandButton?.setOnClickListener")
+            Log.d(TAG, "expandButton?.setOnClickListener")
             togglePip(false)
             setDisplayPipButton(false)
         }
 
         closeButton?.setOnClickListener {
-            Log.d("ReactNativeIVSPlayer", "closeButton?.setOnClickListener")
+            Log.d(TAG, "closeButton?.setOnClickListener")
             setDisplayPipButton(false)
             mPlayerView?.player?.pause()
             mPlayerView?.clipToOutline = false
@@ -1060,7 +1041,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 //        view.clipToOutline = true
 //        view.outlineProvider = object : ViewOutlineProvider() {
 //            override fun getOutline(view: View, outline: Outline) {
-//                Log.d("ReactNativeIVSPlayer", "setRoundedCorners ${view.width} x ${view.height}...")
+//                Log.d(TAG, "setRoundedCorners ${view.width} x ${view.height}...")
 //                outline.setRoundRect(0, 0, view.width, view.height, radius)
 //            }
 //        }
@@ -1070,14 +1051,14 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     public fun setupUI() {
         currentActivity?.runOnUiThread {
-            Log.d("ReactNativeIVSPlayer", "UI Setup initialised...")
+            Log.d(TAG, "UI Setup initialised...")
             getDisplaySize()
             setupCastListener()
             setupMediaRouteButton()
 
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
-            mPlayerView = PlayerViewShared.mPlayerView as PlayerView;
+            mPlayerView = PlayerViewShared.playerView as PlayerView;
             PlayerViewShared.parentLayout = mPlayerView?.parent as ViewGroup
             mPlayerView?.requestFocus();
             mPlayerView?.setControlsEnabled(false);
@@ -1105,7 +1086,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     override fun onScale(detector: ScaleGestureDetector): Boolean {
                         // Handle scale gestures if needed
-                        Log.d("ReactNativeIVSPlayer", "XX3...")
+                        Log.d(TAG, "XX3...")
                         return true
                     }
                 })
@@ -1238,7 +1219,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     private fun pauseVideo() {
-        Log.d("ReactNativeIVSPlayer", "pauseVideo")
+        Log.d(TAG, "pauseVideo")
         playPauseButton?.setImageResource(R.drawable.baseline_play_arrow_24)
         val remoteMediaClient = getRemoteMediaClient()
 
@@ -1252,7 +1233,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     fun _delete() {
-        Log.d("ReactNativeIVSPlayer", "_delete")
+        Log.d(TAG, "_delete")
         currentActivity?.runOnUiThread {
             val mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
 
@@ -1268,7 +1249,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun delete(promise: Promise) {
-        Log.d("ReactNativeIVSPlayer", "delete")
+        Log.d(TAG, "delete")
         _delete()
         promise.resolve(true)
     }
@@ -1277,9 +1258,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun getUrl(promise: Promise) {
         val ret: MutableMap<String, String> = mutableMapOf()
 
-        var contentUrl = ""
-
-        contentUrl = mMediaInfo?.contentUrl ?: ""
+        val contentUrl = mMediaInfo?.contentUrl ?: ""
 
         ret.put("contentUrl", contentUrl)
         promise.resolve(ret)
@@ -1293,7 +1272,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             mPlayerView?.player?.state
         }
 
-        Log.d("ReactNativeIVSPlayer", "getState, state: $state")
+        Log.d(TAG, "getState, state: $state")
         val ret: MutableMap<String, Any?> = mutableMapOf()
         ret.put("state", state)
         promise.resolve(ret)
@@ -1305,7 +1284,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         val call = DefaultReadableMap(options)
         val autoQuality = call.getBoolean("autoQuality", false);
         val greeting = "Hello, quality is: $autoQuality!"
-        Log.d("ReactNativeIVSPlayer", greeting)
+        Log.d(TAG, greeting)
         mPlayerView?.player?.setAutoQualityMode(autoQuality)
         promise.resolve(true)
     }
@@ -1326,7 +1305,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
 
     private fun setDisplayPipButton(displayPipButton: Boolean) {
-        Log.d("ReactNativeIVSPlayer", "setDisplayPipButton displayPipButton: $displayPipButton, currentStateDisplayButton: $currentStateDisplayButton")
+        Log.d(TAG, "setDisplayPipButton displayPipButton: $displayPipButton, currentStateDisplayButton: $currentStateDisplayButton")
         if (currentStateDisplayButton == displayPipButton) return
 
         if (displayPipButton) {
@@ -1395,7 +1374,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun setPip(options: ReadableMap, promise: Promise) {
         val call = DefaultReadableMap(options)
         val pip = call.getBoolean("pip", false)
-        Log.d("ReactNativeIVSPlayer", "setPip pip: $pip")
+        Log.d(TAG, "setPip pip: $pip")
 
         if (pip) {
 //            if (!getIsCastSessionActive()) {
@@ -1450,16 +1429,16 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     if (mediaStatus != null) {
                         muted = mediaStatus.isMute
                     } else {
-                        Log.e("ReactNativeIVSPlayer", "getMuted, mediaStatus is null")
+                        Log.e(TAG, "getMuted, mediaStatus is null")
                     }
 
                     muted
                 }
             } catch (e: ExecutionException) {
-                Log.e("ReactNativeIVSPlayer", "getMuted exception: ${e.message}")
+                Log.e(TAG, "getMuted exception: ${e.message}")
                 false
             } catch (e: InterruptedException) {
-                Log.e("ReactNativeIVSPlayer", "getMuted exception: ${e.message}")
+                Log.e(TAG, "getMuted exception: ${e.message}")
                 false
             }
         } else {
@@ -1475,10 +1454,10 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 remoteMediaClient?.mediaStatus
             }
         } catch (e: ExecutionException) {
-            Log.e("ReactNativeIVSPlayer", "getMediaStatus exception: ${e.message}")
+            Log.e(TAG, "getMediaStatus exception: ${e.message}")
             null
         } catch (e: InterruptedException) {
-            Log.e("ReactNativeIVSPlayer", "getMediaStatus exception: ${e.message}")
+            Log.e(TAG, "getMediaStatus exception: ${e.message}")
             null
         }
     }
