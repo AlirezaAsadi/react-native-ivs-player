@@ -489,9 +489,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private fun setupCastListener() {
         mSessionManagerListener = object : SessionManagerListener<CastSession> {
             override fun onSessionStarted(castSession: CastSession, sessionId: String) {
-                Log.d(
-                    "ReactNativeIVSPlayer",
-                    "SessionManagerListener.onSessionStarted ${mMediaInfo?.contentUrl}"
+                Log.d(TAG ,"SessionManagerListener.onSessionStarted ${mMediaInfo?.contentUrl}"
                 )
 
                 loadCastSessionMedia(castSession)
@@ -1059,11 +1057,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
+            mPlayerView = PlayerViewShared.playerView as PlayerView;
+
             mPlayerView?.parent?.let {
                 PlayerViewShared.parentLayout = it as ViewGroup
             }
-
-            PlayerViewShared.parentLayout = mPlayerView?.parent as ViewGroup
             mPlayerView?.requestFocus();
             mPlayerView?.setControlsEnabled(false);
 
@@ -1187,9 +1185,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 override fun onRouteChanged(routes: List<RouteInfo>) {
                     val routeNames = routes.map { it.name }
 
-                    Log.d(
-                        "ReactNativeIVSPlayer",
-                        "addRouteChangeListener number of routes: ${routes.size} routes: $routeNames"
+                    Log.d(TAG, "addRouteChangeListener number of routes: ${routes.size} routes: $routeNames"
                     )
 
                     notifyCastStatus()
