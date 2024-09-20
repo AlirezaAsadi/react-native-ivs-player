@@ -3,7 +3,6 @@ package com.ivsplayer
 import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.pm.PackageManager
@@ -41,6 +40,7 @@ import com.amazonaws.ivs.player.Player.State
 import com.amazonaws.ivs.player.PlayerException
 import com.amazonaws.ivs.player.PlayerView
 import com.amazonaws.ivs.player.Quality
+import com.amazonaws.ivs.player.ResizeMode
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.LifecycleEventListener
 import com.facebook.react.bridge.Promise
@@ -80,8 +80,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     private val context: Context = reactContext.applicationContext
-    val PLUGIN_VERSION = "0.13.34"
-    private var reactContext: ReactApplicationContext? = null
+    private val PLUGIN_VERSION = "0.13.34"
     private val TAG = "ReactNativeIVSPlayer"
 
 
@@ -93,20 +92,16 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     private val size = Point()
     private val aspectRatio = Rational(16, 9)
-    private var playerViewParams: FrameLayout.LayoutParams? = null
-    var mMediaInfo: MediaInfo? = null
-    var mMediaMetadata: MediaMetadata? = null
+    private var mMediaInfo: MediaInfo? = null
+    private var mMediaMetadata: MediaMetadata? = null
     private var autoPlay = false
-    private var toBack = false
-    private var isInPiPMode = false
-    private var isInitialised = false
 
-    var lastSeekPosBeforeSrcChange: Long? = null
+    private var lastSeekPosBeforeSrcChange: Long? = null
 
-    var expandButton: ImageView? = null
-    var closeButton: ImageView? = null
-    var playPauseButton: ImageView? = null
-    var shadowView: View? = null
+    private var expandButton: ImageView? = null
+    private var closeButton: ImageView? = null
+    private var playPauseButton: ImageView? = null
+    private var shadowView: View? = null
     private var expandAnimation: Animation? = null
     private var collapseAnimation: Animation? = null
 
@@ -120,8 +115,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     var cover: String = ""
     private var mRouteManager: RouteManager? = null
 
-    val METADATA_KEY_STREAM_ID = "ee.forgr.ivsplayer.METADATA_KEY_STREAM_ID"
-    val METADATA_KEY_CHANNEL_SLUG = "ee.forgr.ivsplayer.METADATA_KEY_CHANNEL_SLUG"
+    private val METADATA_KEY_STREAM_ID = "ee.forgr.ivsplayer.METADATA_KEY_STREAM_ID"
+    private val METADATA_KEY_CHANNEL_SLUG = "ee.forgr.ivsplayer.METADATA_KEY_CHANNEL_SLUG"
     private val currentReactContext: ReactContext?
         get() = reactApplicationContext
 
@@ -130,7 +125,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     fun getContext(): Context {
-        return context;
+        return context
     }
 
 
@@ -147,7 +142,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         Log.d(TAG, "onHostPause")
     }
 
-    fun handleOnDestroy() {
+    private fun handleOnDestroy() {
         Log.d(TAG, "handleOnDestroy")
         mPlayerView?.player?.release()
         mPlayerView = null
@@ -155,32 +150,33 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
 
 
-    fun enterPipMode() {
-        Log.d(TAG, "onActivityPaused")
+    private fun enterPipMode() {
+        Log.d(TAG, "enterPipMode")
         val pipSupported = PictureInPictureUtil.isSupportPictureInPicture(reactApplicationContext)
-        Log.d(TAG, "onActivityPaused pipSupported: $pipSupported")
+        Log.d(TAG, "enterPipMode pipSupported: $pipSupported")
 
         mPlayerView?.let {
-            if (it.player.state != Player.State.PLAYING) {
+            Log.d(TAG, "it.player.state is ${it.player.state}")
+            if (it.player.state != State.PLAYING) {
                 return
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val activity: Activity? = currentActivity
+                val activity = currentActivity as? AppCompatActivity
                 val supportsPiP =
                     activity?.packageManager?.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
                         ?: false
-                var didWorked = false
 
-                if (supportsPiP) {
+                Log.d(TAG, "enterPipMode supportsPiP: $supportsPiP, lifecycle.currentState: ${activity?.lifecycle?.currentState}")
+                if (activity?.isInPictureInPictureMode == true) {
+                    Log.d(TAG, "enterPipMode is already InPictureInPictureMode")
+                } else if (supportsPiP && activity?.lifecycle?.currentState in listOf(Lifecycle.State.STARTED, Lifecycle.State.RESUMED)) {
                     val params = PictureInPictureParams.Builder()
                         .setAspectRatio(aspectRatio)
                         .build()
 
-                    didWorked = activity?.enterPictureInPictureMode(params) == true
-                }
+                    activity?.enterPictureInPictureMode(params)
 
-                if (didWorked) {
                     currentActivity?.runOnUiThread {
                         togglePip(true)
                     }
@@ -191,29 +187,35 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
 
+    private fun updatePlayerViewParent(newParent: ViewGroup) {
+        Log.d(TAG, "updatePlayerViewParent")
+        (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
+        val width = ViewGroup.LayoutParams.MATCH_PARENT; //convertDpToPixel(convertPixelsToDp(size.x.toFloat()).toDouble().toFloat()).toInt()
+        val height = ViewGroup.LayoutParams.MATCH_PARENT; //convertDpToPixel(convertPixelsToDp(calcHeight(size.x).toFloat())).toInt()
+
+        if (mPlayerView?.parent == null) {
+            newParent.addView(mPlayerView)
+        }
+        mPlayerView?.layoutParams?.width = width
+        mPlayerView?.layoutParams?.height = height
+        mPlayerView?.invalidate();
+    }
+
     private fun togglePip(pip: Boolean) {
         Log.d(TAG, "togglePip new pip status is $pip")
 
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
-        Log.d(TAG, "pluginView")
-        (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
+
         if (!pip) {
             mainPiPFrameLayout?.visibility = View.GONE
-            val parentLayoutView = PlayerViewShared.parentLayout
-            if (mPlayerView?.parent == null) {
-                parentLayoutView?.addView(mPlayerView, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
-
-                mPlayerView?.requestLayout()
+            PlayerViewShared.parentLayout?.let {
+                updatePlayerViewParent(it)
             }
-
             sendEvent("expandPip")
         } else {
             mainPiPFrameLayout?.visibility = View.VISIBLE
-            if (mPlayerView?.parent == null) {
-                (mainPiPFrameLayout as ViewGroup).addView(mPlayerView)
+            mainPiPFrameLayout?.let {
+                updatePlayerViewParent(it as ViewGroup)
             }
 
             sendEvent("startPip")
@@ -270,7 +272,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         activity
             ?.addOnPictureInPictureModeChangedListener { pictureInPictureModeChangedInfo ->
                 val lifecycleState = activity.lifecycle.currentState
-                val ret = WritableNativeMap()
                 Log.d(TAG, "lifecycleState is $lifecycleState")
                 Log.d(TAG, "isInPictureInPictureMode is ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
                 when (lifecycleState) {
@@ -381,7 +382,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         })
     }
 
-    fun loadUrl(contentUrl: String) {
+    private fun loadUrl(contentUrl: String) {
         createMediaInfo(contentUrl)
 
         if (getIsCastSessionActive()) {
@@ -394,7 +395,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    fun cyclePlayer(prevContentUrl: String, nextUrl: String) {
+    private fun cyclePlayer(prevContentUrl: String, nextUrl: String) {
         var mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
         Log.d(TAG, "cyclePlayer mainPiPFrameLayout: $mainPiPFrameLayout")
 
@@ -439,7 +440,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     // Function to get the root view of the current activity
-    fun getRootView(): View? {
+    private fun getRootView(): View? {
         val activity = currentActivity
         return activity?.window?.decorView?.rootView
     }
@@ -488,9 +489,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private fun setupCastListener() {
         mSessionManagerListener = object : SessionManagerListener<CastSession> {
             override fun onSessionStarted(castSession: CastSession, sessionId: String) {
-                Log.d(
-                    "ReactNativeIVSPlayer",
-                    "SessionManagerListener.onSessionStarted ${mMediaInfo?.contentUrl}"
+                Log.d(TAG ,"SessionManagerListener.onSessionStarted ${mMediaInfo?.contentUrl}"
                 )
 
                 loadCastSessionMedia(castSession)
@@ -1059,7 +1058,10 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
             mPlayerView = PlayerViewShared.playerView as PlayerView;
-            PlayerViewShared.parentLayout = mPlayerView?.parent as ViewGroup
+
+            mPlayerView?.parent?.let {
+                PlayerViewShared.parentLayout = it as ViewGroup
+            }
             mPlayerView?.requestFocus();
             mPlayerView?.setControlsEnabled(false);
 
@@ -1125,7 +1127,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 //                true
 //            }
 
-//            setupRouteManager()
+            setupRouteManager()
             setupSessionManager()
         }
     }
@@ -1177,20 +1179,20 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     }
 
-//    private fun setupRouteManager() {
-//        mRouteManager = RouteManager(context).apply {
-//            addRouteChangeListener { routes ->
-//                val routeNames = routes.map { it.name }
-//
-//                Log.d(
-//                    "ReactNativeIVSPlayer",
-//                    "addRouteChangeListener number of routes: ${routes.size} routes: $routeNames"
-//                )
-//
-//                notifyCastStatus()
-//            }
-//        }
-//    }
+    private fun setupRouteManager() {
+        mRouteManager = RouteManager(context).apply {
+            addRouteChangeListener(object : RouteManager.RouteChangeListener {
+                override fun onRouteChanged(routes: List<RouteInfo>) {
+                    val routeNames = routes.map { it.name }
+
+                    Log.d(TAG, "addRouteChangeListener number of routes: ${routes.size} routes: $routeNames"
+                    )
+
+                    notifyCastStatus()
+                }
+            })
+        }
+    }
 
     @ReactMethod
     fun start(promise: Promise) {
@@ -1380,10 +1382,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         val pip = call.getBoolean("pip", false)
         Log.d(TAG, "setPip pip: $pip")
 
-        if (pip) {
-//            if (!getIsCastSessionActive()) {
-                enterPipMode();
-//            }
+        if (pip && !getIsCastSessionActive()) {
+            enterPipMode();
         }
 
         promise.resolve(true)
