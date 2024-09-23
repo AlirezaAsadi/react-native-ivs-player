@@ -1249,6 +1249,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     it.removeView(mPlayerView)
                 }
             }
+            PlayerViewShared.parentLayout?.let {
+                currentActivity?.runOnUiThread {
+                    it.removeView(mPlayerView)
+                }
+            }
         }
     }
 
