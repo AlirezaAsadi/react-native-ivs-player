@@ -145,7 +145,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private fun handleOnDestroy() {
         Log.d(TAG, "handleOnDestroy")
         mPlayerView?.player?.release()
-        mPlayerView = null
     }
 
 
@@ -1088,7 +1087,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     override fun onScale(detector: ScaleGestureDetector): Boolean {
                         // Handle scale gestures if needed
-                        Log.d(TAG, "XX3...")
                         return true
                     }
                 })
@@ -1240,20 +1238,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun _delete() {
         Log.d(TAG, "_delete")
         currentActivity?.runOnUiThread {
-            val mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
-
             mPlayerView?.player?.pause()
-
-            mainPiPFrameLayout?.let {
-                currentActivity?.runOnUiThread {
-                    it.removeView(mPlayerView)
-                }
-            }
-            PlayerViewShared.parentLayout?.let {
-                currentActivity?.runOnUiThread {
-                    it.removeView(mPlayerView)
-                }
-            }
+            val mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
+            mainPiPFrameLayout?.removeView(mPlayerView)
+            (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
+            (mainPiPFrameLayout?.parent as ViewGroup?)?.removeView(mainPiPFrameLayout)
         }
     }
 
