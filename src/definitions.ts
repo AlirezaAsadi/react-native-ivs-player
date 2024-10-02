@@ -63,6 +63,7 @@ export interface ReactNativeIvsPlayerPlugin {
   delete(): Promise<void>;
   getUrl(): Promise<{ url: string }>;
   getState(): Promise<{ state: ReactNativeIvsPlayerState }>;
+  resetZoom(): Promise<void>;
   setAutoQuality(options?: { autoQuality?: boolean }): Promise<void>;
   getAutoQuality(): Promise<{ autoQuality: boolean }>;
   setPip(options?: { pip?: boolean }): Promise<void>;
