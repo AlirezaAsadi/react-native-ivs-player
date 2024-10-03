@@ -140,6 +140,7 @@ class ReactNativeIVSPlayer: NSObject, IVSPlayer.Delegate {
 class PlayerBaseView: IVSPlayerView {
     private var currentScale: CGFloat = 1.0
     private var initialCenter: CGPoint = .zero
+    private var lastPinchLocation: CGPoint = .zero
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -149,24 +150,41 @@ class PlayerBaseView: IVSPlayerView {
         super.init(coder: coder)
     }
     
+    public func resetZoomAndPosition() {
+        // Reset the scale (identity transform means no scaling or translation)
+        self.transform = CGAffineTransform.identity
+        
+        // Reset the position to the initial center
+        self.center = CGPoint(x: self.bounds.width / 2, y: self.bounds.height / 2)
+        
+        // Reset the current scale and initial center for future gestures
+        self.currentScale = 1.0
+        self.initialCenter = self.center
+        self.lastPinchLocation = self.center
+    }
+    
+    
     public func setupZoomGestures() {
-        
-        // Pinch Gesture for Zooming
+        self.resetZoomAndPosition()
+        // Pinch Gesture for both Zooming and Panning
         let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinchGesture.delegate = self
         self.addGestureRecognizer(pinchGesture)
-        
-        // Pan Gesture for Moving
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        self.addGestureRecognizer(panGesture)
     }
     
     @objc private func handlePinch(_ sender: UIPinchGestureRecognizer) {
         guard let view = sender.view else { return }
         
-        if sender.state == .began || sender.state == .changed {
-            let newScale = currentScale * sender.scale
+        switch sender.state {
+        case .began:
+            // Store the initial center and pinch location
+            initialCenter = view.center
+            lastPinchLocation = sender.location(in: view.superview)
             
-            // Ensure the scale does not go below 1.0
+        case .changed:
+            // Handle zoom (scaling) with a max limit of 4.0
+            let newScale = min(currentScale * sender.scale, 4.0)  // Limit the scale to a maximum of 4
+            
             if newScale >= 1.0 {
                 view.transform = CGAffineTransform(scaleX: newScale, y: newScale)
                 currentScale = newScale
@@ -174,31 +192,30 @@ class PlayerBaseView: IVSPlayerView {
                 view.transform = CGAffineTransform.identity
                 currentScale = 1.0
             }
+            sender.scale = 1.0 // Reset scale for next pinch
             
-            sender.scale = 1.0
-        }
-        
-        if sender.state == .ended {
-            adjustViewPositionAfterZoom(view: view)
-            initialCenter = view.center
-        }
-    }
-    
-    @objc private func handlePan(_ sender: UIPanGestureRecognizer) {
-        guard let view = sender.view else { return }
-        
-        if currentScale > 1.0 {
-            let translation = sender.translation(in: view.superview)
-            var newCenter = CGPoint(x: initialCenter.x + translation.x, y: initialCenter.y + translation.y)
+            // Handle translation (moving)
+            let currentPinchLocation = sender.location(in: view.superview)
+            let translation = CGPoint(
+                x: currentPinchLocation.x - lastPinchLocation.x,
+                y: currentPinchLocation.y - lastPinchLocation.y
+            )
+            var newCenter = CGPoint(
+                x: initialCenter.x + translation.x,
+                y: initialCenter.y + translation.y
+            )
             
             // Adjust the center to make sure the view stays within bounds
             newCenter = adjustCenterForBounds(newCenter)
-            
             view.center = newCenter
             
-            if sender.state == .ended {
-                initialCenter = view.center
-            }
+        case .ended, .cancelled:
+            // Adjust the view position after zoom and translation
+            adjustViewPositionAfterZoom(view: view)
+            initialCenter = view.center
+            
+        default:
+            break
         }
     }
     
@@ -234,6 +251,12 @@ class PlayerBaseView: IVSPlayerView {
         return adjustedCenter
     }
     
+}
+
+extension PlayerBaseView: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true // Allow pinch and pan to be recognized simultaneously
+    }
 }
 
 @objc(IvsPlayerViewManager)
@@ -506,6 +529,11 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     
     @objc func getPluginVersion(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         resolve(["version": self.PLUGIN_VERSION])
+    }
+
+    @objc func resetZoom(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        playerView.resetZoomAndPosition()
+        resolve(true)
     }
     
     @objc func getAutoQuality(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
