@@ -167,12 +167,12 @@ class PlayerBaseView: IVSPlayerView {
     public func setupZoomGestures() {
         self.resetZoomAndPosition()
         // Pinch Gesture for both Zooming and Panning
-        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinchAndPan(_:)))
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchGesture.delegate = self
         self.addGestureRecognizer(pinchGesture)
     }
     
-    @objc private func handlePinchAndPan(_ sender: UIPinchGestureRecognizer) {
+    @objc private func handlePinch(_ sender: UIPinchGestureRecognizer) {
         guard let view = sender.view else { return }
         
         switch sender.state {
@@ -205,7 +205,7 @@ class PlayerBaseView: IVSPlayerView {
                 y: initialCenter.y + translation.y
             )
             
-            // Adjust the center to ensure the view stays within bounds
+            // Adjust the center to make sure the view stays within bounds
             newCenter = adjustCenterForBounds(newCenter)
             view.center = newCenter
             
