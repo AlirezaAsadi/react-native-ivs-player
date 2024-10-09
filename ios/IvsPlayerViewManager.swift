@@ -626,7 +626,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         if isCastActive {
             return false
         }
-        let ispip = call.getBool("pip", true) ?? true
+        let ispip = call.getBool("pip", false) ?? false
         if ispip {
             isClosed = true
             pipController.startPictureInPicture()
