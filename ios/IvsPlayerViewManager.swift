@@ -352,17 +352,19 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     
     func handleNewAirPlaySource() {
         print("ReactNativeIVSPlayer AirPlay is active")
-        self.airplayButton.removeFromSuperview() // try to hide the airplay selector
-        self.playerView.player?.pause()
-        createAvPlayer(url: self.player.path!)
-        avPlayer?.play()
-        // set PLAYING after 1 sec
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.notifyListeners("onState", data: ["state": "PLAYING"])
+        if (self.player.path != nil) {
+            self.airplayButton.removeFromSuperview() // try to hide the airplay selector
+            self.playerView.player?.pause()
+            createAvPlayer(url: self.player.path!)
+            avPlayer?.play()
+            // set PLAYING after 1 sec
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.notifyListeners("onState", data: ["state": "PLAYING"])
+            }
+            // send to listner
+            isCastActive = true
+            self.notifyListeners("onCastStatus", data: ["isActive": true])
         }
-        // send to listner
-        isCastActive = true
-        self.notifyListeners("onCastStatus", data: ["isActive": true])
     }
     
     func removeAvPlayer() {

@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Point
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.util.DisplayMetrics
@@ -25,7 +26,11 @@ import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
+import android.widget.FrameLayout.GONE
+import android.widget.FrameLayout.LayoutParams
+import android.widget.FrameLayout.VISIBLE
 import android.widget.ImageView
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Lifecycle
@@ -95,6 +100,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private var mMediaInfo: MediaInfo? = null
     private var mMediaMetadata: MediaMetadata? = null
     private var autoPlay = false
+    private var playerRect = Rect()
 
     private var lastSeekPosBeforeSrcChange: Long? = null
 
@@ -131,7 +137,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     // Implement the lifecycle methods
     override fun onHostResume() {
-        Log.d(TAG, "onHostResume")
+        Log.d(TAG, "")
+        togglePip(false)
     }
     override fun onHostDestroy() {
         Log.d(TAG, "onHostDestroy")
@@ -150,7 +157,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
 
     private fun enterPipMode() {
-        Log.d(TAG, "enterPipMode")
         val pipSupported = PictureInPictureUtil.isSupportPictureInPicture(reactApplicationContext)
         Log.d(TAG, "enterPipMode pipSupported: $pipSupported")
 
@@ -170,34 +176,48 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 if (activity?.isInPictureInPictureMode == true) {
                     Log.d(TAG, "enterPipMode is already InPictureInPictureMode")
                 } else if (supportsPiP && activity?.lifecycle?.currentState in listOf(Lifecycle.State.STARTED, Lifecycle.State.RESUMED)) {
-                    val params = PictureInPictureParams.Builder()
-                        .setAspectRatio(aspectRatio)
-                        .build()
-
-                    activity?.enterPictureInPictureMode(params)
+                    activity?.enterPictureInPictureMode(getPictureInPictureParams())
 
                     currentActivity?.runOnUiThread {
                         togglePip(true)
                     }
-                    Log.d(TAG, "didWorked")
                 }
             }
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun getPictureInPictureParams(): PictureInPictureParams {
+        val params = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                PictureInPictureParams.Builder()
+                    .setSeamlessResizeEnabled(true)
+                    .setSourceRectHint(playerRect)
+                    .setAspectRatio(aspectRatio)
+                    .build()
+            } else {
+                PictureInPictureParams.Builder()
+                    .setSeamlessResizeEnabled(true)
+                    .setSourceRectHint(playerRect)
+                    .setAspectRatio(aspectRatio)
+                    .build()
+            }
+        } else {
+            PictureInPictureParams
+                .Builder()
+                .setAspectRatio(aspectRatio)
+                .build()
+        }
+        return params
     }
 
 
     private fun updatePlayerViewParent(newParent: ViewGroup) {
         Log.d(TAG, "updatePlayerViewParent")
         (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
-        val width = ViewGroup.LayoutParams.MATCH_PARENT; //convertDpToPixel(convertPixelsToDp(size.x.toFloat()).toDouble().toFloat()).toInt()
-        val height = ViewGroup.LayoutParams.MATCH_PARENT; //convertDpToPixel(convertPixelsToDp(calcHeight(size.x).toFloat())).toInt()
-
         if (mPlayerView?.parent == null) {
             newParent.addView(mPlayerView)
         }
-        mPlayerView?.layoutParams?.width = width
-        mPlayerView?.layoutParams?.height = height
-        mPlayerView?.invalidate();
     }
 
     private fun togglePip(pip: Boolean) {
@@ -206,17 +226,29 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
 
         if (!pip) {
-            mainPiPFrameLayout?.visibility = View.GONE
+            // 1. Send main pip view in the back(to hide)
+            mainPiPFrameLayout?.let {
+                (it.parent as ViewGroup).removeView(it)
+                val rootView = currentActivity?.findViewById<ViewGroup>(android.R.id.content)
+                rootView?.addView(mainPiPFrameLayout, 0)
+            }
+
+            // 2. Add player view to modal view
             PlayerViewShared.parentLayout?.let {
                 updatePlayerViewParent(it)
             }
+
+            // 3. Broadcast pip change event
             sendEvent("expandPip")
         } else {
-            mainPiPFrameLayout?.visibility = View.VISIBLE
+            // 1. Bring main pip view in the back(to show)
+            // 2. Add player view to it
             mainPiPFrameLayout?.let {
+                (it.parent as ViewGroup).bringChildToFront(it)
                 updatePlayerViewParent(it as ViewGroup)
             }
 
+            // 3. Broadcast pip change event
             sendEvent("startPip")
         }
 
@@ -273,15 +305,14 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 val lifecycleState = activity.lifecycle.currentState
                 Log.d(TAG, "lifecycleState is $lifecycleState")
                 Log.d(TAG, "isInPictureInPictureMode is ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
+
                 when (lifecycleState) {
                     Lifecycle.State.CREATED -> {
                         //when user click on Close button of PIP this will trigger.
                         closePip()
                     }
                     Lifecycle.State.STARTED -> {
-                        //when PIP maximize this will trigger
-                        Log.d(TAG, "Closing ${pictureInPictureModeChangedInfo.isInPictureInPictureMode}")
-                        // But only turn it off, as turning on is already triggered by setPip
+                        // Turning on/off pip will trigger this
                         if (!pictureInPictureModeChangedInfo.isInPictureInPictureMode) {
                             activity.runOnUiThread {
                                 togglePip(false)
@@ -421,18 +452,18 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             mainPiPFrameLayout = FrameLayout(currentActivity?.applicationContext as Context).apply {
                 id = mainPiPFrameLayoutId
                 // Apply the Layout Parameters to frameLayout
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
+                layoutParams = LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT
                 )
             }
-            mainPiPFrameLayout.visibility = View.GONE
 
             val finalMainPiPFrameLayout = mainPiPFrameLayout
 
             currentActivity?.runOnUiThread {
                 val rootView = currentActivity?.findViewById<ViewGroup>(android.R.id.content)
-                rootView?.addView(finalMainPiPFrameLayout)
+                // Create it and put it back of the view's stack
+                rootView?.addView(finalMainPiPFrameLayout, 0)
                 loadUrl(nextUrl)
             }
         }
@@ -621,11 +652,12 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             if (getHasVideoCapableRoutes()) {
-                mediaRouteButton?.performClick()
-                Log.d(TAG, "cast performClick")
+                Log.d(TAG, "has video capable routes")
             } else {
                 Log.w(TAG, "cast NO video capable routes")
             }
+
+            mediaRouteButton?.performClick()
         }
     }
 
@@ -861,29 +893,15 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun create(options: ReadableMap, promise: Promise) {
-        setupUI()
-
-        val call = DefaultReadableMap(options)
-        val playbackRate = call.getDouble("playbackRate", 1.0)
-        if (playbackRate in 0.5..2.0) {
-            mPlayerView?.player?.setPlaybackRate(playbackRate.toFloat())
-        } else {
-            mPlayerView?.player?.setPlaybackRate(1f)
-        }
-
-        getDisplaySize()
-        val x = convertDpToPixel(call.getDouble("x", 0.0).toFloat()).toInt()
-        val y = convertDpToPixel(call.getDouble("y", 0.0).toFloat()).toInt()
-        val width = convertDpToPixel(call.getDouble("width", convertPixelsToDp(size.x.toFloat()).toDouble()).toFloat()).toInt()
-        val height = convertDpToPixel(call.getDouble("height", convertPixelsToDp(calcHeight(size.x).toFloat()).toDouble()).toFloat()).toInt()
-
         Log.d(TAG, "create")
+        val call = DefaultReadableMap(options)
+        val zoom = call.getBoolean("zoom", false)
+        val playbackRate = call.getDouble("playbackRate", 1.0)
 
         val url = call.getString("url") ?: return promise.reject("url is required")
         val prevContentUrl = mMediaInfo?.contentUrl ?: url
 
         autoPlay = call.getBoolean("autoPlay", false)
-        val toBack = call.getBoolean("toBack", false)
 
         var streamId = call.getString("streamId")
         if (streamId == null) {
@@ -895,6 +913,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             thumbnailUrl = call.getString("thumbnail")
         }
 
+        setupUI(zoom, playbackRate)
         createMediaMetaData(
             streamId ?: "",
             call.getString("channelSlug", "") ?: "",
@@ -1046,84 +1065,42 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 //    }
 
     @SuppressLint("ClickableViewAccessibility")
-    @ReactMethod
-    public fun setupUI() {
+    private fun setupUI(zoom: Boolean, playbackRate: Double) {
+        Log.d(TAG, "setupUI, zoom: $zoom, playbackRate: $playbackRate")
         currentActivity?.runOnUiThread {
-            Log.d(TAG, "UI Setup initialised...")
+            Log.d(TAG, "setupUI:initialising")
             getDisplaySize()
             setupCastListener()
             setupMediaRouteButton()
 
+
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
             mPlayerView = PlayerViewShared.playerView as PlayerView;
+            Log.d(TAG, "setupUI:mPlayerView is $mPlayerView")
+            if (mPlayerView != null) {
+                // Set parent view
+                mPlayerView?.parent?.let {
+                    PlayerViewShared.parentLayout = it as ViewGroup
+                }
 
-            mPlayerView?.parent?.let {
-                PlayerViewShared.parentLayout = it as ViewGroup
+                // Set focus
+                mPlayerView?.requestFocus();
+                mPlayerView?.setControlsEnabled(false);
+
+                // Set playback
+                if (playbackRate in 0.5..2.0) {
+                    mPlayerView?.player?.setPlaybackRate(playbackRate.toFloat())
+                } else {
+                    mPlayerView?.player?.setPlaybackRate(1f)
+                }
+
+                mPlayerView?.getGlobalVisibleRect(playerRect)
             }
-            mPlayerView?.requestFocus();
-            mPlayerView?.setControlsEnabled(false);
 
 //            prepareButtonInternalPip();
             addPipListener();
             addPlayerListener();
-
-            mPlayerView?.setOutlineProvider(object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, 16f)
-                }
-            })
-
-            gestureDetector =
-                GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-                    override fun onDoubleTap(e: MotionEvent): Boolean {
-//                        toggleFullScreen()
-                        return true
-                    }
-                })
-
-            scaleGestureDetector = ScaleGestureDetector(
-                context,
-                object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                    override fun onScale(detector: ScaleGestureDetector): Boolean {
-                        // Handle scale gestures if needed
-                        return true
-                    }
-                })
-
-//            mPlayerView?.setOnTouchListener { view, event ->
-//                var initialX: Int = 0
-//                var initialY: Int = 0
-//                var initialTouchX: Float = 0f
-//                var initialTouchY: Float = 0f
-//                var maxMarginX: Int = 0
-//                var maxMarginY: Int = 0
-//
-//                gestureDetector?.onTouchEvent(event)
-//                scaleGestureDetector?.onTouchEvent(event)
-//                maxMarginX = size.x - (playerViewParams?.width ?: 0)
-//                maxMarginY = size.y - (playerViewParams?.height ?: 0)
-//                when (event.action) {
-//                    MotionEvent.ACTION_DOWN -> {
-//                        var initialX = playerViewParams?.leftMargin
-//                        var initialY = playerViewParams?.topMargin
-//                        var initialTouchX = event.rawX
-//                        var initialTouchY = event.rawY
-//                        setAutoHideDisplayButton()
-//                    }
-//
-//                    MotionEvent.ACTION_MOVE -> {
-//                        val deltaX = (event.rawX - initialTouchX).toInt()
-//                        val deltaY = (event.rawY - initialTouchY).toInt()
-//                        val newMarginX = (initialX + deltaX).coerceIn(0, maxMarginX)
-//                        val newMarginY = (initialY + deltaY).coerceIn(0, maxMarginY)
-//                        playerViewParams?.leftMargin = newMarginX
-//                        playerViewParams?.topMargin = newMarginY
-//                        mPlayerView?.layoutParams = playerViewParams
-//                    }
-//                }
-//                true
-//            }
 
             setupRouteManager()
             setupSessionManager()
@@ -1247,6 +1224,13 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun resetZoom(promise: Promise) {
+        Log.d(TAG, "resetZoom")
+        // Empty function to match ios
+        promise.resolve(true)
+    }
+
+    @ReactMethod
     fun delete(promise: Promise) {
         Log.d(TAG, "delete")
         _delete()
@@ -1280,10 +1264,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun setAutoQuality(options: ReadableMap, promise: Promise) {
+        Log.d(TAG, "setAutoQuality")
         val call = DefaultReadableMap(options)
         val autoQuality = call.getBoolean("autoQuality", false);
-        val greeting = "Hello, quality is: $autoQuality!"
-        Log.d(TAG, greeting)
         mPlayerView?.player?.setAutoQualityMode(autoQuality)
         promise.resolve(true)
     }
