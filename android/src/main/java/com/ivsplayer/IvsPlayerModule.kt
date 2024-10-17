@@ -137,7 +137,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     // Implement the lifecycle methods
     override fun onHostResume() {
-        Log.d(TAG, "")
+        Log.d(TAG, "onHostResume")
         togglePip(false)
     }
     override fun onHostDestroy() {
@@ -189,19 +189,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     @RequiresApi(Build.VERSION_CODES.O)
     private fun getPictureInPictureParams(): PictureInPictureParams {
         val params = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                PictureInPictureParams.Builder()
-                    .setSeamlessResizeEnabled(true)
-                    .setSourceRectHint(playerRect)
-                    .setAspectRatio(aspectRatio)
-                    .build()
-            } else {
-                PictureInPictureParams.Builder()
-                    .setSeamlessResizeEnabled(true)
-                    .setSourceRectHint(playerRect)
-                    .setAspectRatio(aspectRatio)
-                    .build()
-            }
+            PictureInPictureParams.Builder()
+                .setSeamlessResizeEnabled(true)
+                .setSourceRectHint(playerRect)
+                .setAspectRatio(aspectRatio)
+                .build()
         } else {
             PictureInPictureParams
                 .Builder()
