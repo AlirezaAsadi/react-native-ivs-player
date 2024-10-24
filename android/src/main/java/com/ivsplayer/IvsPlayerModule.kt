@@ -206,9 +206,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     private fun updatePlayerViewParent(newParent: ViewGroup) {
         Log.d(TAG, "updatePlayerViewParent")
-        (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
-        if (mPlayerView?.parent == null) {
-            newParent.addView(mPlayerView)
+        mPlayerView.let {
+            (mPlayerView?.parent as ViewGroup?)?.removeView(it)
+            if (mPlayerView?.parent == null) {
+                newParent.addView(it)
+            }
         }
     }
 
@@ -352,7 +354,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             override fun onDurationChanged(duration: Long) {
                 Log.d(TAG, "Player.Listener.onDurationChanged: $duration")
                 val ret = WritableNativeMap().apply {
-                    putDouble("duration", duration.toDouble())
+                    putDouble("duration", duration.toDouble() / 1000)
                 }
                 sendEvent("onDuration", ret)
             }
@@ -1505,9 +1507,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun seekTo(options: ReadableMap, promise: Promise) {
         val call = DefaultReadableMap(options)
         val position = call.getFloat("position")
+        Log.d(TAG, "seekTo position: $position")
 
         if (position != null && position >= 0) {
             val longPos = (position * 1000).toLong() // position is in `seconds`, we need `ms`
+            Log.d(TAG, "seekTo longPos: $longPos")
 
             if (getIsCastSessionActive()) {
                 val remoteMediaClient = getCastSession()?.remoteMediaClient
