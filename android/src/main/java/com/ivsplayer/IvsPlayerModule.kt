@@ -919,6 +919,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         currentActivity?.runOnUiThread {
             cyclePlayer(prevContentUrl, url)
         }
+        promise.resolve(true)
     }
 
     private fun createMediaMetaData(
@@ -1519,8 +1520,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 remoteMediaClient?.seek(longPos)
             } else {
                 mPlayerView?.player?.seekTo(longPos)
-                promise.resolve(true)
             }
+            promise.resolve(true)
         } else {
             promise.reject(
                 "Error", "Invalid seek position"
