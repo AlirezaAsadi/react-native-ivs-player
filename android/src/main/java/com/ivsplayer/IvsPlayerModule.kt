@@ -215,7 +215,8 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     private fun togglePip(pip: Boolean) {
-        Log.d(TAG, "togglePip new pip status is $pip")
+        Log.d(TAG, "togglePip new pip status is $pip while playerView is $mPlayerView")
+        if (mPlayerView == null) return;
 
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
 
