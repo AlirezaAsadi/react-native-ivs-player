@@ -1269,9 +1269,14 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getAutoQuality(promise: Promise) {
-        val ret: MutableMap<String, Any?> = mutableMapOf()
-        ret.put("autoQuality", mPlayerView?.player?.isAutoQualityMode)
-        promise.resolve(ret)
+        try {
+            val ret: MutableMap<String, Any?> = mutableMapOf()
+            val autoQuality = mPlayerView?.player?.isAutoQualityMode ?: false
+            ret["autoQuality"] = autoQuality
+            promise.resolve(Arguments.makeNativeMap(ret)) // Convert to WritableNativeMap for React Native
+        } catch (e: Exception) {
+            promise.reject("Error", "Failed to fetch auto quality", e)
+        }
     }
 
     @ReactMethod
@@ -1472,17 +1477,23 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getQualities(promise: Promise) {
-        val ret = WritableNativeMap()
-        val qualities = mPlayerView?.player?.qualities
-        val qualitiesArray = qualities?.map { it.toString() }
-        val writableArray: WritableArray = Arguments.createArray()
-        qualitiesArray?.forEach { x ->
-            writableArray.pushString(x)
-        }
+        try {
+            val ret = WritableNativeMap()
+            Log.d(TAG, "Qualities are ${mPlayerView?.player?.qualities}")
+            val qualities = mPlayerView?.player?.qualities?.sortedByDescending { it.bitrate }?.map { it.name }
+            val writableArray: WritableArray = Arguments.createArray()
 
-        ret.putArray("qualities", writableArray)
-        promise.resolve(ret)
+            qualities?.forEach { quality ->
+                writableArray.pushString(quality.toString())
+            }
+
+            ret.putArray("qualities", writableArray)
+            promise.resolve(ret)
+        } catch (e: Exception) {
+            promise.reject("Error", "Failed to fetch qualities", e)
+        }
     }
+
 
     @ReactMethod
     fun getSeekPosition(promise: Promise) {
