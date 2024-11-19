@@ -100,6 +100,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private var mMediaInfo: MediaInfo? = null
     private var mMediaMetadata: MediaMetadata? = null
     private var autoPlay = false
+    private var isPipMode = false
     private var playerRect = Rect()
 
     private var lastSeekPosBeforeSrcChange: Long? = null
@@ -216,7 +217,15 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
     private fun togglePip(pip: Boolean) {
         Log.d(TAG, "togglePip new pip status is $pip while playerView is $mPlayerView")
-        if (mPlayerView == null) return;
+        if (mPlayerView == null) {
+            Log.d(TAG, "togglePip ignored due to player view is not initialised.")
+            return;
+        }
+        if (isPipMode == pip) {
+            Log.d(TAG, "togglePip ignored due to state unchanged.")
+            return;
+        }
+        isPipMode = pip;
 
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
 
