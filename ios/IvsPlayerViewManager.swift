@@ -1000,6 +1000,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             self.lastSeekPosBeforeSrcChange = self.player.position
             
             self.loadUrl(url: callSrc)
+            resolve(true)
         }
         
     }
