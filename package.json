@@ -1,6 +1,6 @@
 {
   "name": "react-native-ivs-player",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Amazon Ivs player for react native",
   "source": "./src/index.tsx",
   "main": "./lib/commonjs/index.js",
