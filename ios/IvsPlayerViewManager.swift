@@ -518,21 +518,26 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { [unowned self] _ in
-            if self.player.state != .playing {
+            print("ReactNativeIVSPlayer playCommand triggered, isCastActive: \(isCastActive)")
+            if (self.isCastActive && (self.avPlayer != nil)) {
+                avPlayer?.play()
+            } else {
                 self.player.play()
-                return .success
             }
-            return .commandFailed
+            return .success
         }
         
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.pauseCommand.addTarget { [unowned self] _ in
-            if self.player.state == .playing {
+            print("ReactNativeIVSPlayer pauseCommand triggered, isCastActive: \(isCastActive)")
+            if (self.isCastActive && (self.avPlayer != nil)) {
+                avPlayer?.pause()
+            } else {
                 self.player.pause()
-                return .success
             }
-            return .commandFailed
+            return .success
         }
+        
     }
     
     @objc func getPluginVersion(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
