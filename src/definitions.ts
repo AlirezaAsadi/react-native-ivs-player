@@ -25,6 +25,7 @@ export interface ReactNativeIvsPlayerCreateOptions {
   title?: string;
 
   autoPlay?: boolean;
+  autoQuality?: boolean;
   pip?: boolean;
   zoom?: boolean;
 }

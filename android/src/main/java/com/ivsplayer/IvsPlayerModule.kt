@@ -100,6 +100,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private var mMediaInfo: MediaInfo? = null
     private var mMediaMetadata: MediaMetadata? = null
     private var autoPlay = false
+    private var autoQuality = true
     private var isPipMode = false
     private var playerRect = Rect()
 
@@ -906,6 +907,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         val prevContentUrl = mMediaInfo?.contentUrl ?: url
 
         autoPlay = call.getBoolean("autoPlay", false)
+        autoQuality = call.getBoolean("autoPlay", true)
 
         var streamId = call.getString("streamId")
         if (streamId == null) {
@@ -1092,6 +1094,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 // Set focus
                 mPlayerView?.requestFocus();
                 mPlayerView?.setControlsEnabled(false);
+                mPlayerView?.player?.setAutoQualityMode(autoQuality)
 
                 // Set playback
                 if (playbackRate in 0.5..2.0) {

@@ -777,6 +777,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             let _options = options;
             self.setupNowPlayingInfo(title: title, subTitle: subTitle, url: cover)
             self.setupRemoteTransportControls()
+            self.player.autoQualityMode = call.getBool("autoQuality", true)
             let setupDone = self.cyclePlayer(prevUrl: self.player.path?.absoluteString ?? "", nextUrl: url)
             print("ReactNativeIVSPlayer setupDone \(setupDone)")
             self._setPip(options)
