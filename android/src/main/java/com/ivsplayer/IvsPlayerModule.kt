@@ -1473,7 +1473,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                 }
             }
 
-            player.setQuality(quality as Quality)
+            if (quality != null) {
+                player.setQuality(quality)
+            }
         }
 
         promise.resolve(true)
