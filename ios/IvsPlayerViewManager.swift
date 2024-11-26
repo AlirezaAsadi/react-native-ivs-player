@@ -565,10 +565,8 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     }
     
     @objc func getQualities(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-        var qualities = [String]()
-        for quality in self.player.qualities {
-            qualities.append(quality.name)
-        }
+        let sortedQualities = self.player.qualities.sorted { $0.width < $1.width }
+        var qualities = sortedQualities.map { $0.name }
         resolve(["qualities": qualities])
     }
     
