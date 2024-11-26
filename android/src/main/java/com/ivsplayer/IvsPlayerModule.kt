@@ -1494,11 +1494,11 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         try {
             val ret = WritableNativeMap()
             Log.d(TAG, "Qualities are ${mPlayerView?.player?.qualities}")
-            val qualities = mPlayerView?.player?.qualities?.sortedByDescending { it.bitrate }?.map { it.name }
+            val qualities = mPlayerView?.player?.qualities?.sortedBy { it.width }?.map { it.name }
             val writableArray: WritableArray = Arguments.createArray()
 
             qualities?.forEach { quality ->
-                writableArray.pushString(quality.toString())
+                writableArray.pushString(quality)
             }
 
             ret.putArray("qualities", writableArray)
