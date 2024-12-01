@@ -540,7 +540,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
                 self.player.pause()
             }
             return .success
-            }
+        }
         
     }
     
