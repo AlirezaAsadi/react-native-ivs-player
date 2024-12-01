@@ -296,12 +296,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
     public override init() {
         super.init()
         self.viewController.view.backgroundColor = UIColor.black
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("ReactNativeIVSPlayer ‼️ Could not setup AVAudioSession: \(error)")
-        }
+        self.setBackgroundAudioConfig()
         playerDelegate.plugin = self
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidBecomeActive(notification:)), name: UIApplication.didBecomeActiveNotification, object: nil)
         
@@ -415,6 +410,15 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         
     }
     
+    private func setBackgroundAudioConfig() {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("ReactNativeIVSPlayer ‼️ Could not setup AVAudioSession: \(error)")
+        }
+    }
+    
     @objc func handleAudioRouteChange(_ notification: NSNotification) {
         guard let userInfo = notification.userInfo,
               let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
@@ -524,7 +528,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             } else {
                 self.player.play()
             }
-            return .success
+                return .success
         }
         
         commandCenter.pauseCommand.isEnabled = true
@@ -535,8 +539,8 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             } else {
                 self.player.pause()
             }
-            return .success
-        }
+                return .success
+            }
         
     }
     
@@ -759,6 +763,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
         let call = PluginArgs(options: options)
         let playbackRate = call.getFloat("playbackRate", 1.0)
         
+        self.setBackgroundAudioConfig()
         if (self.player.playbackRate != playbackRate && playbackRate >= 0.5 && playbackRate <= 2.0) {
             self.player.playbackRate = playbackRate
         } else {
