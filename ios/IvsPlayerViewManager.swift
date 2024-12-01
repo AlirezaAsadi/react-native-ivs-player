@@ -528,7 +528,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             } else {
                 self.player.play()
             }
-                return .success
+            return .success
         }
         
         commandCenter.pauseCommand.isEnabled = true
@@ -539,7 +539,7 @@ public class IvsPlayerViewManager: RCTViewManager, AVPictureInPictureControllerD
             } else {
                 self.player.pause()
             }
-                return .success
+            return .success
             }
         
     }
