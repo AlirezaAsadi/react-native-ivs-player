@@ -31,6 +31,15 @@ class IvsPlayerViewManager : SimpleViewManager<View>() {
     }
     parentView.addView(playerView)
 
+    // Get the player(surface view) and re-attach it to correctly calculate the size
+    val surfaceView = playerView.getChildAt(0) as? SurfaceView
+    if (surfaceView != null) {
+      playerView.removeViewAt(0)
+      playerView.addView(surfaceView, 0, ViewGroup.LayoutParams(
+        LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT
+      ))
+    }
+
     // Save the instance to the shared object
     PlayerViewShared.playerView = playerView
     PlayerViewShared.parentLayout = parentView;

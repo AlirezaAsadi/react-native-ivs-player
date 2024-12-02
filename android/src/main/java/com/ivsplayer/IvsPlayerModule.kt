@@ -208,7 +208,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         mPlayerView.let {
             (mPlayerView?.parent as ViewGroup?)?.removeView(it)
             if (mPlayerView?.parent == null) {
-                newParent.addView(it);
+                newParent.addView(it, ViewGroup.LayoutParams(
+                    LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT
+                ));
             }
         }
     }
@@ -1228,11 +1230,12 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     fun _delete() {
         Log.d(TAG, "_delete")
         currentActivity?.runOnUiThread {
-            mPlayerView?.player?.pause()
+            mPlayerView?.player?.release()
             val mainPiPFrameLayout = currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
             mainPiPFrameLayout?.removeView(mPlayerView)
             (mPlayerView?.parent as ViewGroup?)?.removeView(mPlayerView)
             (mainPiPFrameLayout?.parent as ViewGroup?)?.removeView(mainPiPFrameLayout)
+            PlayerViewShared.playerView = null
         }
     }
 
