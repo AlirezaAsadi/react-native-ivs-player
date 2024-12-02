@@ -156,8 +156,6 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         mPlayerView?.player?.release()
     }
 
-
-
     private fun enterPipMode() {
         val pipSupported = PictureInPictureUtil.isSupportPictureInPicture(reactApplicationContext)
         Log.d(TAG, "enterPipMode pipSupported: $pipSupported")
@@ -205,19 +203,18 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
         return params
     }
 
-
     private fun updatePlayerViewParent(newParent: ViewGroup) {
         Log.d(TAG, "updatePlayerViewParent")
         mPlayerView.let {
             (mPlayerView?.parent as ViewGroup?)?.removeView(it)
             if (mPlayerView?.parent == null) {
-                newParent.addView(it)
+                newParent.addView(it);
             }
         }
     }
 
     private fun togglePip(pip: Boolean) {
-        Log.d(TAG, "togglePip new pip status is $pip while playerView is $mPlayerView")
+        Log.d(TAG, "togglePip new pip status is $pip while playerView is $mPlayerView  and its parent is ${mPlayerView?.parent}")
         if (mPlayerView == null) {
             Log.d(TAG, "togglePip ignored due to player view is not initialised.")
             return;
@@ -226,11 +223,14 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             Log.d(TAG, "togglePip ignored due to state unchanged.")
             return;
         }
+        if (mPlayerView?.parent == null) {
+            Log.d(TAG, "player view does not have any parent.")
+        }
         isPipMode = pip;
 
         val mainPiPFrameLayout = currentActivity?.findViewById<View>(mainPiPFrameLayoutId)
 
-        if (!pip) {
+        if (!pip && mPlayerView?.parent != null) {
             // 1. Send main pip view in the back(to hide)
             mainPiPFrameLayout?.let {
                 (it.parent as ViewGroup).removeView(it)
@@ -240,7 +240,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
             // 2. Add player view to modal view
             PlayerViewShared.parentLayout?.let {
-                updatePlayerViewParent(it)
+                it.post {
+                    updatePlayerViewParent(it)
+                }
             }
 
             // 3. Broadcast pip change event
@@ -250,7 +252,9 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             // 2. Add player view to it
             mainPiPFrameLayout?.let {
                 (it.parent as ViewGroup).bringChildToFront(it)
-                updatePlayerViewParent(it as ViewGroup)
+                it.post {
+                    updatePlayerViewParent(it as ViewGroup)
+                }
             }
 
             // 3. Broadcast pip change event
@@ -343,7 +347,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
                     }
                 }
 
-                if (state == State.PLAYING && mPlayerView?.parent == null) {
+                if (state == State.PLAYING && mPlayerView?.parent == null && isPipMode) {
                     val mainPiPFrameLayout =
                         currentActivity?.findViewById<FrameLayout>(mainPiPFrameLayoutId)
                     mainPiPFrameLayout?.addView(mPlayerView)
@@ -899,6 +903,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun create(options: ReadableMap, promise: Promise) {
         Log.d(TAG, "create")
+        if (PlayerViewShared.playerView == null) return;
         val call = DefaultReadableMap(options)
         val zoom = call.getBoolean("zoom", false)
         val playbackRate = call.getDouble("playbackRate", 1.0)
