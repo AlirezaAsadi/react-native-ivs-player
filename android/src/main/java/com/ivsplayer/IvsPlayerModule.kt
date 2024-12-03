@@ -1090,7 +1090,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
 
             currentActivity?.findViewById<View>(android.R.id.content)?.setBackgroundColor(Color.BLACK)
 
-            mPlayerView = PlayerViewShared.playerView as PlayerView;
+            mPlayerView = PlayerViewShared.playerView;
             Log.d(TAG, "setupUI:mPlayerView is $mPlayerView")
             if (mPlayerView != null) {
                 // Set parent view
