@@ -1,9 +1,16 @@
 import android.content.Context
 import android.util.Log
 import android.widget.FrameLayout
+import com.amazonaws.ivs.player.Cue
+import com.amazonaws.ivs.player.Player
+import com.amazonaws.ivs.player.PlayerException
 import com.amazonaws.ivs.player.PlayerView
+import com.amazonaws.ivs.player.Quality
+import java.nio.ByteBuffer
 
-class CustomPlayerLayout(context: Context, val playerView: PlayerView) : FrameLayout(context) {
+class CustomPlayerLayout(context: Context, private val playerView: PlayerView) : FrameLayout(context) {
+
+    private var aspectRatio: Double = 1.77777777778 // 16:9
 
     private val mLayoutRunnable = Runnable {
         measure(
@@ -14,6 +21,58 @@ class CustomPlayerLayout(context: Context, val playerView: PlayerView) : FrameLa
 
     init {
         addView(playerView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+
+        playerView.player.addListener(object : Player.Listener() {
+            override fun onVideoSizeChanged(videoWidth: Int, videoHeight: Int) {
+                Log.d(TAG, "Video size changed: width=$videoWidth, height=$videoHeight")
+                val newAspectRation = videoWidth * 1.0 / videoHeight
+                if(aspectRatio != newAspectRation) {
+                    Log.d(TAG, "Aspect ratio changed: $aspectRatio -> $newAspectRation")
+                    aspectRatio = newAspectRation
+                    requestLayout() // Trigger a relayout with the new video dimensions
+                }
+            }
+
+            override fun onStateChanged(state: Player.State) {
+                Log.d(TAG, "Player state changed: $state")
+            }
+
+            override fun onError(error: PlayerException) {
+                Log.e(TAG, "Player error: ${error.message}")
+            }
+
+            override fun onCue(cue: Cue) {
+                Log.d(TAG, "Cue received: $cue")
+            }
+
+            override fun onDurationChanged(duration: Long) {
+                Log.d(TAG, "Duration changed: $duration ms")
+            }
+
+            override fun onRebuffering() {
+                Log.d(TAG, "Rebuffering event")
+            }
+
+            override fun onSeekCompleted(position: Long) {
+                Log.d(TAG, "Seek completed to position: $position")
+            }
+
+            override fun onQualityChanged(quality: Quality) {
+                Log.d(TAG, "Quality changed: $quality")
+            }
+
+            override fun onAnalyticsEvent(name: String, properties: String) {
+                Log.d(TAG, "Analytics event: $name, properties: $properties")
+            }
+
+            override fun onMetadata(mediaType: String, data: ByteBuffer) {
+                Log.d(TAG, "Metadata received: type=$mediaType, dataSize=${data.remaining()}")
+            }
+
+            override fun onNetworkUnavailable() {
+                Log.d(TAG, "Network unavailable")
+            }
+        })
     }
 
 
@@ -24,7 +83,7 @@ class CustomPlayerLayout(context: Context, val playerView: PlayerView) : FrameLa
         val containerHeight = bottom - top
 
         // Calculate aspect ratios
-        val videoAspectRatio = 1.77777777778 // 16:9
+        val videoAspectRatio = aspectRatio
         val containerAspectRatio = containerWidth.toFloat() / containerHeight
 
         // Calculate scaled dimensions
