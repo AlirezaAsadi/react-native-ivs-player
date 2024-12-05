@@ -154,6 +154,7 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
     private fun handleOnDestroy() {
         Log.d(TAG, "handleOnDestroy")
         mPlayerView?.player?.release()
+        destroyActiveCastSession();
     }
 
     private fun enterPipMode() {
@@ -892,6 +893,15 @@ class IvsPlayerModule(reactContext: ReactApplicationContext) :
             throw IllegalStateException("getRemoteMediaClient", e)
         } catch (e: InterruptedException) {
             throw IllegalStateException("getRemoteMediaClient", e)
+        }
+    }
+
+    private fun destroyActiveCastSession() {
+        // Destroy the casting session if there is any
+        if (getIsCastSessionActive() && getRemoteMediaClient() != null) {
+            Log.d(TAG, "There is a active cast session that needs to be destroyed");
+
+            getRemoteMediaClient()?.stop();
         }
     }
 
