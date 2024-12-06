@@ -25,10 +25,10 @@ class CustomPlayerLayout(context: Context, private val playerView: PlayerView) :
         playerView.player.addListener(object : Player.Listener() {
             override fun onVideoSizeChanged(videoWidth: Int, videoHeight: Int) {
                 Log.d(TAG, "Video size changed: width=$videoWidth, height=$videoHeight")
-                val newAspectRation = videoWidth * 1.0 / videoHeight
-                if(aspectRatio != newAspectRation) {
-                    Log.d(TAG, "Aspect ratio changed: $aspectRatio -> $newAspectRation")
-                    aspectRatio = newAspectRation
+                val newAspectRatio = videoWidth * 1.0 / videoHeight
+                if(aspectRatio != newAspectRatio) {
+                    Log.d(TAG, "Aspect ratio changed: $aspectRatio -> $newAspectRatio")
+                    aspectRatio = newAspectRatio
                     requestLayout() // Trigger a relayout with the new video dimensions
                 }
             }
